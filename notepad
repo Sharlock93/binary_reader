@@ -1,0 +1,125 @@
+
+
+type -> defined_type 
+
+
+struct -> type -> decls -> var_decls -> types too
+
+struct can be a type
+
+fields
+
+	var decls; *
+
+typedef that creates an alias
+
+
+decl | type -> type name
+
+aliases another type
+
+
+
+typedef void (*func_type)(void);
+
+func_type *ptr = { func1, func2, func3 };
+
++ 
+	1
+	ptr
+
+		func_type* 
+
+		return type is func_type*
+
+* 
+	ptr
+	return func_type base
+
+(*ptr)();
+
+
+
+
+============================================================
+
+todo
+
+- arrary index && array init/compound literals done
+	- array init/literal - done
+	i32[] meow = [1, 2, 3, 4] <> { 1, 2, 3, 4}
+
+	mewo[0] = 32;
+
+- field access -> or . => done
+
+	struct x {
+		i32 meow;
+	}
+
+	x t = { 2 } // comp_lit
+
+	t.meow = 4;
+
+	x *some = &t;
+	some->meow = 5; 
+
+
+- address of operator - done
+	i32 some_var = 2;
+	i32 *ptr = nil;
+	ptr = &some_var;
+
+- ptr deref - done
+	i32 i = *ptr;
+
+
+
+- switch cases
+	switch(condi) { switch_body }
+
+
+- else & else if:
+	parse and type check
+
+============================================================
+
+
+code: 
+
+
+
+setting up static data must be done before jumpping into the code
+
+so before code run: 
+- mv str "hello world" to data_section
+	- maybe cpy to mem? 
+
+
+setup stack ptr
+
+
+===========================================================
+
+4 bytes for i; on the stack? 
+4 bytes for x
+4 bytes for y;
+
+first temp mem: 
+
+write 1 to data <- addr on decl i
+write 2 to data <- addr on decl x
+
+mov i -> rax
+mov x -> rbx 
+add rax, rbx
+mov rax -> @y_mem
+
+write 
+
+
+
+=========================================================
+
+We should keep track of the registers and what they contain,
+this could delete emitting unnecessary loads
