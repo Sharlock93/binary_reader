@@ -1,0 +1,19 @@
+notes:
+small E (x86)
+
+printf("hello world", 1);
+
+- params 2 ( value: 1)  moved to register edx
+- params 1 ( value: "hell..) address moved to rcx 
+- call into function -> first thing is save all used registers? rcx, rdx, r8, r9? 
+
+
+
+
+
+
+
+Stack: 
+- starts at high value? 
+- stack room = > sub some amount from RSP - 0x0 <- making space
+00000000000

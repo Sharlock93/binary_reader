@@ -1,4 +1,60 @@
+x64 calling convention
 
+
+- RAX, RCX, RDX, R8, R9,  R10,  R10 => can be overwritten, no need to save ? 
+	- calle should not worry about these
+	- caller should -> save restore 
+
+
+- RBX, RBP, RSP, RDI, RSI, R12-15 => must be saved in the func called later restored? 
+
+
+
+
+
+// /
+
+RAX <= RAX
+
+save value push RAX
+
+1 + func();
+
+
+
+
+[ RAX ]
+
+
+
+
+ 1  + 2
+ 12+
+
+ push 1
+ push 2 
+ push +
+
+ pop +
+ 	val = 1 + 2
+ push val
+
+ 1
+
+ left => mov RAX <=1 
+ push RAX
+ right <= mov RAX <= 2 
+
+ RAX < 2
+
+ ADD RAX + 1
+
+ add RAX, RAX => 4
+
+ pop RAX 
+ 
+
+==========================================
 
 type -> defined_type 
 
@@ -120,6 +176,31 @@ write
 
 
 =========================================================
+==========================================================
 
-We should keep track of the registers and what they contain,
-this could delete emitting unnecessary loads
+
+Code Gen Setup: 
+	- move RSP => RAX
+	- MOVE RBP => RCX
+	- SET RBP & RSP to your own memory locations
+	- PUSH RAX, RCX => save stack ptr and base
+
+	- END Of "main" func => 
+		- pop stack top => RSP, RBP restore the stack
+
+
+
+
+go through decls => 
+	if id == main => assign main_memory to rand_func
+	jump
+
+- jump into "main_function"
+
+
+generating functions: 
+	- they are just memory addresses to jump to
+		- every function must save some registers and restore them if used
+	
+
+

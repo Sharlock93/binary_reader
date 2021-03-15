@@ -28,14 +28,12 @@ sh_decl **decls = NULL;
 
 int main(void) {
 
-#if 1 
 	main_source = read_file("test.txt", NULL);
 
 
 	setup_internal_types();
 	setup_keywords();
 	
-	xed_init();
 
 	do {
 		sh_tokenize();
@@ -50,20 +48,8 @@ int main(void) {
 		sh_type_check_decl(decl[0]);
 	}
 
+	xed_init();
 	gen_main();
 
-
-
-	/* for(sh_decl **decl = decls; decl != buf_end(decls); decl++) { */
-	/* 	sh_gen_ir_decl(decl[0]); */
-	/* } */
-    /*  */
-	/* for(sh_operation **op = operations; op != buf_end(operations); op++) { */
-	/* 	sh_print_op(op[0]); */
-	/* 	printf("\n"); */
-	/* } */
-
-
-#endif
 	return 0;
 }

@@ -1422,7 +1422,7 @@ sh_statement* sh_parse_statement() {
 	if(is_type(current_token)) {
 		new_statement->type = SH_VAR_DECL_STATEMENT;
 		new_statement->var_decl = sh_parse_var_decl();
-		buf_push(decls, new_statement->var_decl);
+		/* buf_push(decls, new_statement->var_decl); */
 		assert(expect_token(';'));
 	} else if(is_keyword(&for_keyword)) {
 		new_statement = sh_parse_for_statement();

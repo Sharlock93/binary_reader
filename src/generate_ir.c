@@ -6,20 +6,20 @@ typedef enum sh_register {
 	RCX,
 	RDX,
 	RBX,
-
-	R8,
-	R9,
-	R10,
-	R11,
-
 	RSP,
 	RBP,
 	RSI,
 	RDI,
+	R8,
+	R9,
+	R10,
+	R11,
 	R12,
 	R13,
 	R14,
 	R15,
+
+
 } sh_register;
 
 
@@ -183,9 +183,6 @@ sh_op_operand sh_new_stack_location(u64 stack_offset) {
 
 	return operand;
 }
-
-
-
 
 
 sh_op_operand sh_new_ir_imm_operand(i64 imm_val, sh_register store_reg) {

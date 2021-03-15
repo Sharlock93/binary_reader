@@ -1,0 +1,255 @@
+note:
+	i32 array[4] = { 1, 2, 3, 4 };
+
+	i32 *m = array;
+
+	++m;
+	m++;
+	
+	++(m);
+
+
+	++(m++);
+
+	++ and -- operators need an l-value // variable directly attached to them
+
+
+/// 
+
+
+keyword_typedef := 'typedef'
+aggregate_types: struct.
+
+literals: integer 'SH_INT', identifier 'SH_IDENTIFIER'
+
+internal_types:
+	 = u/i8_be
+	 | u/i16_be
+	 | u/i32_be
+	 | u/i64_be 
+	 | f32_be 
+	 | f64_be
+	 | string
+	 | char
+
+
+type_alias = 
+	<keyword_typedef> <type> <identifier>;
+
+type_declaration: 
+	<keyword_struct> <identifier> '{' <type>+ '}' ';'
+
+type =	<internal_type> { '*' | '[' <array_size> ']' }
+	 | identifer (type) { '*' | '[' <array_size> ']' }
+	 | type_declaration
+
+
+array_size:
+	= integer
+	| '?'
+
+variable_declaration: 
+	 = <type> <identifier> ;
+	 | <type>  <identifier> ;
+	 | <type> <identifier> '=' init-expression;
+
+init-expression = expression
+
+arg_list: type ( ',' arg_list )*
+
+function_decl: 
+	<type> <identifier> '(' arg_list ')' <statement-list>
+
+statement-list: '{' statement+ '}'
+
+top_levels: 
+	| variable_decl
+	| function_decl
+
+
+what is a defined type: 
+
+has a name: 
+has size byte
+can be an internal_type -> good;
+
+
+can be a struct -> fields -> type -> defined_type
+
+
+	can be an alias via typedef;
+		- can be pointer to a type
+		- can be an array to a type
+		- can be an alais
+
+
+===============================================================
+statements: 
+
+	decls => done
+
+	expression
+		operators
+		assignment
+
+
+literals: SH_INT, SH_FLOAT..etc
+mult_ops = '*' '/'
+add_ops = '+' '-'
+
+
+compound literal : 
+	| { 1, 2, 3, 4} // yes
+	| [1, 2, 3, 4 ]
+
+
+base = literals
+	 | SH_IDENTIFER
+
+
+function_call = sh_expression '(' sh_expression? (',' sh_expression)* ')'
+array_index = sh_expression '[' sh_expression ']'
+pointer_deref = '*' SH_IDENTIFER 
+
+base_expr = base ;// | function_call | array_index | pointer_deref 
+unary = ( '*' | '++' | '--' ) base_expr ? ( '--' | '++')
+bitwise = unary ( bitwise_ops unary)
+logical = bitwise ( logical_ops bitwise)*
+multiply = logical ( mult_ops logical )*
+addition = multiply ( add_ops multiply) *
+expression = addition 
+
+
+
+
+logical ops:
+	&& | || | == | !=  | < | > | <= | >= 
+
+bitwise ops: 
+	& | | | ^ 
+	and or xor 
+
+-test^hello
+
+
+
+1**new
+
+
+
+1*2 + 8*4
+
+= > add
+ => '+'
+ =>  multi
+	=> base_expr
+		=> base
+			=> literals (1)
+	 => '*'
+	=> base_expr
+		=> base
+			=> literal (2)
+
+
+ => multi
+	=> '*'
+ 	=> base_expr
+		=> base
+			=> literals (8)
+	=> base_expr
+		=> base
+			=> literals (4)
+
+
+1 + 2 + 3 * 4
+
+=> addition
+	right side => multi => base_expr => base => lit 1
+
+	left_side: 
+		=> '+'
+		right_side => multi => base_expr => base => lit 2
+			left_side: 
+				=> '+'
+
+					right_side: 
+					=> mult => base_expr => base => lit 3
+						'*'
+						left: 
+							=> mult => base_expr => base => lit 4
+	
+
+i32 meow = 1;
+
+decl  = init-expr;
+
+program: 
+	functions
+	decls
+
+decls 
+
+function = function-decl { compound statement }
+
+statements
+
+would be 
+	var decl and assignment expression ? 
+
+
+assignment expression? hmmmm
+
+if we hit '=' its an assignment
+	before	'='  must be an expression so must after
+
+
+	expression = expression? 
+
+
+
+=================================================================
+
+
+statement: = ';'
+	| var_decl;
+	| assignment_statement
+	| for_loop_statement
+	| while_statement
+	| if_statement
+	| switch_statement
+	| do_while_statement
+
+assignment_statement:  
+	| sh_expression '=' sh_expression
+
+
+for_loop_statement: for_keyword '(' init_for_statement? ; for_conditional_expr? ; sh_expression?  ')' compound_statement
+
+while_statement:  while_keyword '(' expr ')' compound_statement
+
+else-statement = else_keyword compound_statement
+elseif statement = elseif_keyword '(' expr ')' compound_statement
+
+if_statement:     if_keyword '(' expr ')' compound_statement { elseif-statmemnt* } { else-statement }
+
+do_while:     do_keyword compound_statement while_keyword '(' expr ')';
+switch_statement: switch_keyword '(' expr ')' '{' switch_stmt* '}'
+
+switch_stmt: (case_keyword const_expr  | default_keyword) ':' statement*
+
+
+
+switch() {
+	case X:
+	case X:
+	case X:
+	case X:
+	default:
+}
+
+
+for_conditional_expr => must eval to true or false
+	
+init_for_statement:
+	| var_decl
+	| assignment_statement

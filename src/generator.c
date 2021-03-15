@@ -1,4 +1,4 @@
-typedef void (*rand_func)();
+typedef int (*rand_func)();
 
 typedef sh_op_source_type sh_memory_type;
 
@@ -26,6 +26,7 @@ char* stack_base = NULL; // where the stack starts
 char* stack_top = NULL; // where it is now
 char* data_section = NULL;
 char* data_section_header = NULL;
+char* main_func_address = NULL;
 
 i32 stack_size = 1024;
 i32 data_section_size = 1024;
@@ -44,29 +45,18 @@ void write_pop_stack_register(sh_register reg);
 void write_add_register_rm(sh_register reg, sh_register rm, char *number, i32 data_size);
 void write_mov(sh_op_operand dst, sh_op_operand src);
 char* get_reg_name_op(sh_op_operand reg);
+char* get_reg_name(sh_register reg);
 
 
 // returns a register that is different from reg1 
-sh_register choose_register_keep_left(sh_register reg1, sh_register reg2) {
-	for(sh_register i = reg1; i < R15; i++) {
-		if(reg1 != i)  {
-			reg2 = i;
-			break;
-		}
-
-	}
-
-	return reg2;
-}
 
 sh_register choose_register(sh_register reg1) {
-	sh_register re = RAX + 1;
-	for(sh_register i = re; i < R15; i++) {
-		if(reg1 != i)  {
+	sh_register re = reg1;
+	for(sh_register i = RAX; i < R15; i++) {
+		if(re != i && i != RSP && i != RBP) {
 			re = i;
 			break;
 		}
-
 	}
 
 	return re;
@@ -84,7 +74,6 @@ sh_register choose_register_keep_both(sh_register reg1, sh_register reg2) {
 
 void write_mov(sh_op_operand dst, sh_op_operand src) {
 
-	/* printf("%s[%s] <= %s[%s]\n", op_source_names[dst.type], register_names[dst.reg], register_names[src.reg], op_source_names[src.type]); */
 	switch(src.type) {
 		case SH_SRC_IMMEDIATE: {
 
@@ -175,25 +164,9 @@ void write_mov(sh_op_operand dst, sh_op_operand src) {
 				} break;
 
 			}
-
-
-
 		} break;
 
 	}
-
-}
-
-
-void write_sub_register_rm(sh_register reg, sh_register rm, char *number, i32 data_size) {
-	if(data_size > 4) {
-		WRITE_HEAD(REX_W); // 
-	}
-	
-	write_to_register(rm, number, data_size);
-
-	WRITE_HEAD(0x2B);
-	WRITE_HEAD(0xC0 | (reg << 3) | rm);
 
 }
 
@@ -218,7 +191,7 @@ void write_push_stack_register(sh_register reg) {
 		reg &= (0x7);
 	}
 
-	WRITE_HEAD(0x50 | reg);
+	WRITE_HEAD(0x50 + reg);
 }
 
 void write_pop_stack_register(sh_register reg) {
@@ -229,7 +202,7 @@ void write_pop_stack_register(sh_register reg) {
 		reg &= (0x7);
 	}
 
-	WRITE_HEAD(0x58 | reg);
+	WRITE_HEAD(0x58 + reg);
 }
 
 char* write_data_section(char *data_to_write, i32 bytes) {
@@ -251,7 +224,7 @@ void setup_system() {
 void make_stack_size(i32 bytes) {
 	WRITE_HEAD(REX_W);
 	WRITE_HEAD(0x83);
-	WRITE_HEAD(0b11101000|RSP);
+	/* WRITE_HEAD(0b11101000|RSP); */
 
 	char *where = (char*)&bytes;
 	WRITE_HEAD(where[0]);
@@ -260,7 +233,7 @@ void make_stack_size(i32 bytes) {
 void reduce_stack_size(i32 bytes) {
 	WRITE_HEAD(REX_W);
 	WRITE_HEAD(0x83);
-	WRITE_HEAD(0b11000000|RSP);
+	/* WRITE_HEAD(0b11000000|RSP); */
 
 	char *where = (char*)&bytes;
 	WRITE_HEAD(where[0]);
@@ -270,9 +243,18 @@ void reduce_stack_size(i32 bytes) {
 // does mov? 
 void write_to_register(sh_register reg, char* data_to_write, i32 data_size) {
 
+	i8 prefix = 0;
+
 	if(data_size > 4) {
-		WRITE_HEAD(REX_W); // 
+		prefix = 0b01001000;
 	}
+
+	if(reg >= R8) {
+		prefix |= 0b01000001;
+	}
+
+	WRITE_HEAD(prefix);
+
 	WRITE_HEAD(0xb8 + reg);
 	for(int i = 0; i < data_size; i++) {
 		WRITE_HEAD(data_to_write[i]);
@@ -284,13 +266,6 @@ sh_op_operand write_add_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 
 	i8 encode_mod_rm = 0; // 
 	i8 op_code = 0;
-
-	// should fix imm + reg => reg + imm
-	/* if(left_op.type == SH_SRC_IMMEDIATE && right_op.type != SH_SRC_IMMEDIATE) { */
-	/* 	sh_op_operand t = left_op; */
-	/* 	left_op = right_op; */
-	/* 	right_op = t; */
-	/* } */
 
 	// we should mov to the result at the end? 
 	switch(left_op.type) {
@@ -315,32 +290,25 @@ sh_op_operand write_add_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 						WRITE_HEAD(ptr[i]); //one byte rex one byte op 
 					}
 
-					write_mov(result_dest, left_op);
-
 				} break;
 
 				case SH_SRC_REGISTER: {
 
 					WRITE_HEAD(REX_W);
 					WRITE_HEAD(0x01);
-					encode_mod_rm = 0b11000000 | left_op.reg << 3 | right_op.reg;
+					encode_mod_rm = 0b11000000 | right_op.reg << 3 | left_op.reg;
 					WRITE_HEAD(encode_mod_rm);
-
-					/* write_mov(result_dest, left_op); */
 
 				} break;
 
 
 				case SH_SRC_MEMORY: {
 
-					printf("%s %s %s\n", get_reg_name_op(result_dest), get_reg_name_op(left_op), get_reg_name_op(right_op));
 					write_to_register(right_op.reg, (char*)&right_op.mem_address, 8);
 
 					WRITE_HEAD(REX_W);
 					WRITE_HEAD(0x03);
 					WRITE_HEAD(0b0000000 | left_op.reg << 3 | right_op.reg);
-
-					/* write_mov(result_dest, left_op); */
 
 				} break;
 
@@ -366,19 +334,16 @@ sh_op_operand write_add_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 						WRITE_HEAD(ptr[i]); //one byte rex one byte op 
 					}
 
-					/* return temp_left; */
-					write_mov(result_dest, temp_left);
-
 				} break;
 
 				case SH_SRC_REGISTER: {
+
+					write_mov(sh_new_reg_location(left_op.reg), left_op);
 
 					WRITE_HEAD(REX_W);
 					WRITE_HEAD(0x01);
 					encode_mod_rm = 0b11000000 | right_op.reg << 3 | left_op.reg;
 					WRITE_HEAD(encode_mod_rm);
-
-					write_mov(result_dest, left_op);
 
 				} break;
 
@@ -390,8 +355,6 @@ sh_op_operand write_add_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					WRITE_HEAD(REX_W);
 					WRITE_HEAD(0x03);
 					WRITE_HEAD(0b00000000 | left_op.reg << 3 | right_op.reg);
-
-					write_mov(result_dest, sh_new_reg_location(left_op.reg));
 
 				} break;
 			}
@@ -420,32 +383,12 @@ sh_op_operand write_add_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 						WRITE_HEAD(ptr[i]); //one byte rex one byte op 
 					}
 
-					printf("%s %s %s\n", get_reg_name_op(result_dest), get_reg_name_op(left_op), get_reg_name_op(right_op));
-					write_mov(result_dest, sh_new_reg_location(left_op.reg));
-
 				} break;
 
 				case SH_SRC_REGISTER: {
 
 				} break;
 				
-				/* case SH_SRC_REGISTER: { */
-                /*  */
-				/* 	put */
-				/* 	op_code = 0x81; */
-                /*  */
-				/* 	encode_mod_rm = 0b11000000; */
-				/* 	encode_mod_rm |=  left_op.reg; */
-                /*  */
-				/* 	char *ptr = (char*)&right_op.imm_val; */
-				/* 	for(int i = 0; i < 4; i++) { */
-				/* 		WRITE_HEAD_REL(ptr[i], 3 + i); //one byte rex one byte op  */
-				/* 	} */
-                /*  */
-				/* 	write_mov(result_dest, left_op); */
-                /*  */
-				/* } break; */
-
 				default: {
 					puts("case not handled");
 				} break;
@@ -489,9 +432,6 @@ sh_op_operand write_sub_op(sh_op_dst result_dest, sh_op_operand right_op) {
 					encode_mod_rm |=  result_dest.reg;
 
 					char *ptr = (char*)&right_op.imm_val;
-					for(int i = 0; i < 4; i++) {
-						WRITE_HEAD_REL(ptr[i], 3 + i); //one byte rex one byte op 
-					}
 
 				} break;
 
@@ -556,14 +496,11 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 	i8 encode_mod_rm = 0; // 
 	i8 op_code = 0;
 
-	printf("%s %s %s\n", op_source_names[result_dest.type], op_source_names[left_op.type], op_source_names[right_op.type]);
-
 	switch(left_op.type) {
 		case SH_SRC_IMMEDIATE: { //everything is 3 OP
 			switch(right_op.type) {
 
 				case SH_SRC_MEMORY: {
-
 					write_to_register(right_op.reg, (char*)&left_op.mem_address, 8);
 
 					encode_mod_rm = 0b00000000;
@@ -578,8 +515,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 						WRITE_HEAD(ptr[i]); //one byte rex one byte op 
 					}
 
-					//TODO double check if this is actually needed or not? 
-					/* write_mov(result_dest, sh_new_reg_location(right_op.reg)); */
 				} break;
 
 				case SH_SRC_IMMEDIATE: {
@@ -590,7 +525,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					encode_mod_rm |=  result_dest.reg << 3 | left_op.reg;
 
 					WRITE_HEAD(REX_W);
-					/* WRITE_HEAD(0x0F); */
 					WRITE_HEAD(0x69);
 					WRITE_HEAD(encode_mod_rm);
 
@@ -599,13 +533,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 						WRITE_HEAD(ptr[i]); //one byte rex one byte op 
 					}
 
-
-					/* encode_mod_rm = 0b11000000; */
-					/* encode_mod_rm |=  result_dest.reg << 3 | result_dest.reg; */
-
-
-					/* write_mov(sh_new_reg_location(result_dest.reg), sh_new_reg_location(left_op.reg)); */
-
 				} break;
 
 
@@ -613,7 +540,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 
 					write_to_register(left_op.reg, (char*)&left_op.imm_val, 8);
 
-					printf("what %s %s %s\n", get_reg_name_op(result_dest), get_reg_name_op(left_op), get_reg_name_op(right_op));
 					encode_mod_rm = 0b11000000;
 					encode_mod_rm |=  left_op.reg << 3 | right_op.reg;
 
@@ -622,21 +548,10 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					WRITE_HEAD(0xAf);
 					WRITE_HEAD(encode_mod_rm);
 
-					/* char *ptr = (char*)&left_op.imm_val; */
-					/* for(int i = 0; i < 4; i++) { */
-					/* 	WRITE_HEAD(ptr[i]); //one byte rex one byte op  */
-					/* } */
-
-
-					write_mov(result_dest, sh_new_reg_location(left_op.reg));
-
 				} break;
 
 			}
 
-			
-		
-			
 		} break;
 
 
@@ -656,9 +571,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					WRITE_HEAD(0xAF);
 					WRITE_HEAD(encode_mod_rm);
 
-					write_mov(sh_new_reg_location(result_dest.reg), sh_new_reg_location(left_op.reg));
-
-
 				} break;
 
 				case SH_SRC_MEMORY: { // left and righ mem are memory
@@ -674,15 +586,12 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					WRITE_HEAD(0xAF);
 					WRITE_HEAD(encode_mod_rm);
 
-					write_mov(sh_new_reg_location(result_dest.reg), sh_new_reg_location(left_op.reg));
-
 				} break;
 
 				case SH_SRC_IMMEDIATE: {
 
 					write_to_register(left_op.reg, (char*)&left_op.mem_address, 8);
 
-					/* printf("what %s %s %s\n", get_reg_name_op(result_dest), get_reg_name_op(left_op), get_reg_name_op(right_op)); */
 					encode_mod_rm = 0b00000000;
 					encode_mod_rm |=  left_op.reg << 3 | left_op.reg;
 
@@ -695,8 +604,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 						WRITE_HEAD(ptr[i]); //one byte rex one byte op 
 					}
 
-
-					write_mov(result_dest, sh_new_reg_location(left_op.reg));
 
 				} break;
 			}
@@ -713,11 +620,7 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					WRITE_HEAD(REX_W);
 					WRITE_HEAD(0x0f);
 					WRITE_HEAD(0xAF);
-					/* if(result_dest.reg == RAX) { */
-					/* 	WRITE_HEAD(0b11000000 | result_dest.reg << 3 | right_op.reg); */
-					/* } else { */
-						WRITE_HEAD(0b11000000 | right_op.reg << 3 | left_op.reg);
-					/* } */
+					WRITE_HEAD(0b11000000 | left_op.reg << 3 | right_op.reg);
 
 				} break;
 
@@ -734,9 +637,6 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 
 					WRITE_HEAD(encode_mod_rm);
 
-					//TODO double check if this is actually needed or not? 
-					/* write_mov(result_dest, sh_new_reg_location(left_op.reg)); */
-					write_mov(sh_new_reg_location(result_dest.reg), sh_new_reg_location(left_op.reg));
 				} break;
 
 				case SH_SRC_IMMEDIATE: {
@@ -752,20 +652,8 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 					WRITE_HEAD(0xAF);
 					WRITE_HEAD(encode_mod_rm);
 
-					/* char *ptr = (char*)&right_op.imm_val; */
-					/* for(int i = 0; i < 4; i++) { */
-					/* 	WRITE_HEAD(ptr[i]); //one byte rex one byte op  */
-					/* } */
-
-
-					/* write_mov(sh_new_reg_location(result_dest.reg), sh_new_reg_location(left_op.reg)); */
-
 				} break;
 			}
-
-
-
-
 
 		} break;
 
@@ -781,44 +669,24 @@ sh_op_operand write_mul_op(sh_op_dst result_dest, sh_op_operand left_op, sh_op_o
 
 sh_op_operand write_operation(sh_op_type op, sh_op_dst result_dest, sh_op_operand left_op, sh_op_operand right_op) {
 
-
-	printf("%s[%s] = %s[%s] %s %s[%s]\n",
-			op_source_names[result_dest.type],
-			get_reg_name(result_dest.reg),
-			op_source_names[left_op.type],
-			get_reg_name(left_op.reg),
-			op_type_name[op],
-			op_source_names[right_op.type],
-			get_reg_name(right_op.reg)
-	);
-
-	/* if(result_dest.type == SH_SRC_REGISTER) { */
-	/* 	if(left_op.type == SH_SRC_MEMORY && result_dest.reg == left_op.reg) { */
-	/* 		left_op.reg = choose_register_keep_both(result_dest.reg, right_op.reg); */
-	/* 	} */
     /*  */
-	/* 	if(right_op.type == SH_SRC_MEMORY && result_dest.reg == right_op.reg) { */
-	/* 		right_op.reg = choose_register_keep_both(result_dest.reg, left_op.reg); */
-	/* 	} */
-	/* } */
+	/* printf("%s[%s] = %s[%s] %s %s[%s]\n", */
+	/* 		op_source_names[result_dest.type], */
+	/* 		get_reg_name(result_dest.reg), */
+	/* 		op_source_names[left_op.type], */
+	/* 		get_reg_name(left_op.reg), */
+	/* 		op_type_name[op], */
+	/* 		op_source_names[right_op.type], */
+	/* 		get_reg_name(right_op.reg) */
+	/* ); */
 
-	// @Note: needs more consideration 
-	// if we move left op to result register, we might break what is inside the register
-	// 	we should only move if we know righ op is not a register == result reg
-	
 	switch(op) {
 		case SH_ADD_OP: {
-			/* if(result_dest.type == SH_SRC_REGISTER && right_op.type != SH_SRC_REGISTER) { */
-			/* 	write_mov(result_dest, left_op); */
-			/* } */
-
 			return write_add_op(result_dest, left_op, right_op);
 		} break;
-
 		case SH_SUB_OP: {
 			return write_sub_op(result_dest, right_op);
 		} break;
-
 		case SH_MUL_OP: {
 			return write_mul_op(result_dest, left_op, right_op);
 		} break;
@@ -896,6 +764,26 @@ void sh_gen_var_decl(sh_decl *decl);
 sh_op_operand sh_gen_expr(sh_expression *expr, sh_register store_result);
 
 
+sh_op_operand write_func_call(sh_expression *func_expr, sh_register reg) {
+
+	/* if(reg != RAX) { */
+		/* write_push_stack_register(RAX); */
+	/* } */
+
+	write_to_register(reg, (char*)&func_expr->var_decl->mem_info->mem_address, 8);
+
+	WRITE_HEAD(0xff);
+	WRITE_HEAD(0b11010000 | reg);
+
+
+	write_mov(sh_new_reg_location(reg), sh_new_reg_location(RAX));
+
+	/* if(reg != RAX) { */
+	/* write_pop_stack_register(RAX); */
+	/* } */
+
+	return sh_new_reg_location(reg);
+}
 
 void sh_gen_var_decl(sh_decl *decl) {
 
@@ -931,43 +819,46 @@ sh_op_operand sh_gen_id_expr(sh_expression *id_expr, sh_register store_result) {
 }
 
 sh_op_operand sh_gen_expr(sh_expression *expr, sh_register store_result) {
+
+	sh_op_operand res = {0};
+
 	switch(expr->type) {
 		case SH_INT_LITERAL:
 			write_to_register(store_result, (char*)&expr->vi64, 8);
-			return sh_new_reg_location(store_result);
-			/* return sh_new_ir_imm_operand(expr->vi64, store_result); */
+			res = sh_new_reg_location(store_result);
 			break;
-
 		case SH_ID_EXPR: {
-			/* sh_op_operand reg = sh_new_reg_location(store_result); */
-			/* write_mov(reg, ); */
-			return sh_gen_id_expr(expr, store_result);
+			res = sh_gen_id_expr(expr, store_result);
 		} break;
 
 		case SH_OPERATOR_EXPR: {
 
 
-			sh_register right_op_store = choose_register(store_result);
+			sh_op_operand left = sh_gen_expr(expr->left_op, store_result);
 
-			sh_op_operand right_op = sh_gen_expr(expr->right_op, right_op_store);
+			sh_register right_store = choose_register(store_result);
 
-			sh_register left_op_store = choose_register(right_op_store);
+			write_push_stack_register(store_result);
+			sh_op_operand right = sh_gen_expr(expr->right_op, right_store);
 
-			sh_op_operand left_op = sh_gen_expr(expr->left_op, left_op_store);
+			write_pop_stack_register(store_result);
+			res = write_operation(sh_convert_expr_op(expr->op),
+					sh_new_reg_location(store_result),
+					left, right
+					);
 
-			sh_op_dst dst = sh_new_reg_location(store_result);
 
-			// if they are the same register, they must be stored inside another register
-			/* if(left_op.type == right_op.type && left_op.reg == right_op.reg) { */
-			/* 	dst.reg = choose_register_keep_both(left_op.reg, right_op.reg); */
-			/* } */
+		} break;
 
-			write_operation(sh_convert_expr_op(expr->op), dst, left_op, right_op);
-			return dst;
+
+		case SH_FUNC_EXPR:  {
+			res = write_func_call(expr->func_expr, store_result);// ???
 		} break;
 
 	}
 
+
+	return res;
 }
 
 void sh_gen_statement(sh_statement *stmt) {
@@ -976,23 +867,40 @@ void sh_gen_statement(sh_statement *stmt) {
 		case SH_COMPOUND_STATEMENT: {
 			sh_statement **c = stmt->statements;
 			for(i32 i = 0; i < buf_len(c); i++) {
-				sh_gen_statement(c[0]);
+				sh_gen_statement(c[i]);
 			}
 		} break;
 
 		case SH_VAR_DECL_STATEMENT: {
+			sh_gen_var_decl(stmt->var_decl);
+		} break;
 
+		case SH_RETURN_STATEMENT: {
+			sh_gen_expr(stmt->ret_expr, RAX);
+			WRITE_HEAD(0xC3);
 		} break;
 
 	}
 }
 
+
+void generate_func_start(u64 mem_address) {
+	// store the registers , x64 -> RCX, RDX, R8, R9 -> first 9 registers => stack
+
+	// restore them
+}
+
+
 void sh_gen_func_decl(sh_decl *decl) {
 	assert_exit(decl->type == SH_FUNC_DECL, "not a func decl");
 
+	i32 local_variable = 0;
+	
+	generate_func_start(decl->mem_info->mem_address);
+
 	// sh_make_space for local vars
 	sh_gen_statement(decl->func.compound_statement);
-
+	// generate func end? 
 }
 
 
@@ -1002,7 +910,21 @@ void sh_gen_decl(sh_decl *decl) {
 			sh_gen_var_decl(decl);
 			break;
 		case SH_FUNC_DECL:
+
+			if(decl->mem_info == NULL) {
+				decl->mem_info = (sh_memory_info *)calloc(1, sizeof(sh_memory_info));
+
+				decl->mem_info->mem_address = (u64)writer_head;//sh_allocate_memory_main(decl->total_size); // is it a local var? gen stack
+				decl->mem_info->mem_type = SH_SRC_MEMORY;
+			}
+
+
+			if(decl->name_len == 4 && strncmp(decl->name, "main", 4) == 0) {
+				main_func_address = writer_head;
+			}
+
 			sh_gen_func_decl(decl);
+
 			break;
 
 	}
@@ -1010,17 +932,6 @@ void sh_gen_decl(sh_decl *decl) {
 
 
 void testing_op() {
-
-
-	//  multiplay memory location mem1 and mem2
-	// mov value of [mem2] to some reg1
-
-	// mov reg1  mem1_addr
-	// mov reg1, [reg1] //reg 1 has value of [mem1]
-	// mov reg2, mem2
-	// mov , reg1
-	/* write_mov(sh_new_mem_location_reg(0x0, RAX), sh_new_mem_location_reg(0x2, RAX)); */
-
 	write_operation(SH_MUL_OP,
 			sh_new_mem_location_reg(0x0, RAX),
 			sh_new_mem_location_reg(0x0, RAX),
@@ -1028,34 +939,60 @@ void testing_op() {
 	);
 }
 
-void gen_main() {
 
-	memory_setup();
+void gen_setup_stack() {
+	write_mov(sh_new_reg_location(RAX), sh_new_reg_location(RSP));
+	write_mov(sh_new_reg_location(RCX), sh_new_reg_location(RBP));
 
-#if 0
-	testing_op();
 
-#else
-	for(sh_decl **d = decls;d != buf_end(decls); d++) {
-		sh_gen_decl(*d);
-	}
-#endif
+	write_to_register(RSP, (char*)&stack_top, 8); // what D: 
+	write_to_register(RBP, (char*)&stack_base, 8); // what D:  increase down wars i.e: from mem location 1 to 0 on push
+	write_push_stack_register(RAX);
+	write_push_stack_register(RCX);
+}
 
-	rand_func f = (rand_func) main_mem;
+void print_code() {
 
 	i32 main_mem_len = (i32)( writer_head - main_mem );
-
 	i32 len_acc = 0;
-	puts("================gen code");
+
+	puts("======================================");
+	puts("Code Gen:");
+	xed_init();
 	while(main_mem_len > 0) {
 		i32 length = print_gen_code(main_mem + len_acc);
 		main_mem_len -= length;
 		len_acc += length;
 	}
-	puts("=================end gen code");
+	puts("=================");
+}
+
+
+void gen_main() {
+
+	memory_setup();
+
+#if 0
+	/* testing_op(); */
+#else
+
+	/* gen_setup_stack(); */
+
+	for(sh_decl **d = decls;d != buf_end(decls); d++) {
+		sh_gen_decl(*d);
+	}
+
+#endif
+
+
+	print_code();
+
+
+	rand_func f = (rand_func) main_func_address;
 
 	__try {
-		/* f(); */
+		int x = f();
+		printf("%d\n", x);
 	}
 	__except(EXCEPTION_EXECUTE_HANDLER) {
 		printf("yeet");

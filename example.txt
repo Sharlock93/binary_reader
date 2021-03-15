@@ -1,0 +1,38 @@
+// types
+
+
+base_types: 
+	u,i8
+	u,i16
+	u,i32
+	u,i64
+
+	u,i8be
+	u,i16be
+	u,i32be
+	u,i64be
+
+	f32, f64
+	string // specify size? 
+
+arrays //fixed size
+pointers //??
+
+
+// type decl
+
+typespec name;
+
+typespec:
+	base_type[pointer | array]
+
+
+// maybe
+
+struct image {
+	u8 *data;
+	i32 width;
+	i32 height;
+} ?
+
+
