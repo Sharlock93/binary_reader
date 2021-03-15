@@ -1,12 +1,16 @@
 i32 func() {
-	return 7;
+	return 1 + (2 + ( 3 + 1 ));
 }
 
+struct hello {
+	i32 x;
+	i32 y;
+}
 
 i32 main() {
 
+	i32 meow = 1;
 
-	return func() + func()*func() + (5*func() + (10*func())) + func() + func()*func() + (5*func() + (10*func()));
 }
 
 

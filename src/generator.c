@@ -52,7 +52,7 @@ char* get_reg_name(sh_register reg);
 
 sh_register choose_register(sh_register reg1) {
 	sh_register re = reg1;
-	for(sh_register i = RAX; i < R15; i++) {
+	for(sh_register i = re; i < R15; i++) {
 		if(re != i && i != RSP && i != RBP) {
 			re = i;
 			break;
@@ -766,9 +766,9 @@ sh_op_operand sh_gen_expr(sh_expression *expr, sh_register store_result);
 
 sh_op_operand write_func_call(sh_expression *func_expr, sh_register reg) {
 
-	/* if(reg != RAX) { */
-		/* write_push_stack_register(RAX); */
-	/* } */
+	if(reg != RAX) {
+		write_push_stack_register(RAX);
+	}
 
 	write_to_register(reg, (char*)&func_expr->var_decl->mem_info->mem_address, 8);
 
@@ -778,9 +778,9 @@ sh_op_operand write_func_call(sh_expression *func_expr, sh_register reg) {
 
 	write_mov(sh_new_reg_location(reg), sh_new_reg_location(RAX));
 
-	/* if(reg != RAX) { */
-	/* write_pop_stack_register(RAX); */
-	/* } */
+	if(reg != RAX) {
+		write_pop_stack_register(RAX);
+	}
 
 	return sh_new_reg_location(reg);
 }
@@ -833,15 +833,9 @@ sh_op_operand sh_gen_expr(sh_expression *expr, sh_register store_result) {
 
 		case SH_OPERATOR_EXPR: {
 
-
 			sh_op_operand left = sh_gen_expr(expr->left_op, store_result);
-
 			sh_register right_store = choose_register(store_result);
-
-			write_push_stack_register(store_result);
 			sh_op_operand right = sh_gen_expr(expr->right_op, right_store);
-
-			write_pop_stack_register(store_result);
 			res = write_operation(sh_convert_expr_op(expr->op),
 					sh_new_reg_location(store_result),
 					left, right
