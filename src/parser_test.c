@@ -1,12 +1,14 @@
 // foward declarations
-
 // copy src to dest and free src, return len of src without null, uses strlen
 
+i32 has_func_call = 0;
 i32 copy_and_free(char *dest, char *src);
 typedef struct sh_expression sh_expression;
 typedef struct sh_memory_info sh_memory_info;
 sh_expression* sh_parse_expression();
 sh_expression* sh_parse_base_expr();
+sh_expression* sh_expr_int_literal();
+sh_expression* sh_parse_unary_expr();
 
 typedef struct sh_statement sh_statement;
 sh_statement* sh_parse_compound_statement();
@@ -15,7 +17,13 @@ sh_statement* sh_parse_statement();
 
 typedef struct sh_decl sh_decl;
 
-sh_decl* sh_parse_var_decl();
+typedef enum sh_storage_type {
+	SH_NO_STORAGE,
+	SH_GLOBAL_STORAGE,
+	SH_LOCAL_STORAGE
+} sh_storage_type;
+
+sh_decl* sh_parse_var_decl(sh_storage_type storage);
 char* sh_print_decl(sh_decl *decl);
 char* sh_print_expr(sh_expression *expr);
 char* sh_print_statement(sh_statement *stmt);
@@ -68,6 +76,7 @@ typedef struct sh_typedef_decl {
 
 typedef struct sh_struct_field_decl {
 	sh_typespec *type;
+	i32 offset; // bytes
 } sh_struct_field_decl;
 
 
@@ -76,16 +85,47 @@ typedef struct sh_struct_decl {
 } sh_struct_decl;
 
 
+
+typedef enum sh_tag_type {
+	SH_UNKNOWN_TAG,
+	SH_DLL_IMPORT_TAG,
+	SH_VAR_IMPORT_TAG
+} sh_tag_type;
+
+
+typedef struct sh_dll_import_tag {
+	char *dll_file_path;
+	char *func_name;
+} sh_dll_import_tag;
+
+typedef struct sh_var_import_tag {
+	char *var_name;
+} sh_var_import_tag;
+
+
+typedef struct sh_decl_tag {
+	sh_tag_type type;
+
+	union {
+		sh_dll_import_tag dll;
+		sh_var_import_tag var;
+	};
+
+} sh_decl_tag;
+
+
 typedef struct sh_decl {
 	sh_decl_type type;
 	i32 total_size;
 	i32 type_checked;
+
+	sh_storage_type storage;
+	sh_memory_info *mem_info;
+
+	sh_decl_tag **tags; // ?
 	const char *name;
 	i32 name_len;
 
-	sh_memory_info *mem_info;
-
-	i32 base_type_size;
 	union {
 		struct { //normal ints? 
 			union {
@@ -137,6 +177,211 @@ typedef struct sh_decl {
 } sh_decl;
 
 
+typedef enum sh_statement_type {
+	
+	SH_INITIALIZED_STATEMENT,
+	SH_COMPOUND_STATEMENT,
+	SH_VAR_DECL_STATEMENT,
+	SH_ASSIGNMENT_STATEMENT,
+	SH_INC_DEC_STATEMENT,
+	/* SH_DEC_STATEMENT, */
+	SH_FOR_STATEMENT,
+	SH_WHILE_STATEMENT,
+	SH_IF_STATEMENT,
+	SH_ELIF_STATEMENT,
+	SH_ELSE_STATEMENT,
+	SH_RETURN_STATEMENT,
+	SH_BREAK_STATEMENT,
+	SH_CONTINUE_STATEMENT,
+	SH_FUNC_CALL_STATEMENT,
+
+} sh_statement_type;
+
+
+typedef struct sh_statement {
+	sh_statement_type type;
+	i32 stmt_size;
+
+	union {
+
+		struct {
+			sh_decl *var_decl;
+		};
+
+		struct {
+			sh_expression *unary_expr;
+		};
+
+		struct {
+			sh_expression *left_side_expr;
+			sh_expression *right_side_expr;
+		};//assignment operator;
+
+		struct {
+			sh_statement *init_statement;
+			sh_expression *condition_expr;
+			sh_statement *post_loop_expr;
+			sh_statement  *comp_statement;
+
+			sh_statement **elseif_stmts;
+			sh_statement *else_stmt;
+		}; // 
+
+		struct { //return
+			sh_expression *ret_expr;
+		};
+
+		struct {
+			sh_statement **statements;
+		};
+	};
+
+} sh_statement;
+
+
+typedef enum sh_expression_type {
+	SH_UNKNOWN_EXPR,
+	SH_INT_LITERAL,
+	SH_FLOAT_LITERAL,
+	SH_STRING_LITERAL,
+	SH_ARRAY_LITERAL,
+	SH_STRUCT_LITERAL,
+	SH_NIL_LITERAL,
+	SH_FIELD_ASSIGNMENT_EXPR,
+	SH_ID_EXPR, // nothing must remain as ID? 
+	SH_VAR_EXPR,
+
+	SH_PTR_DEREF_EXPR,
+
+	SH_OPERATOR_EXPR,
+
+	SH_INC_EXPR,
+	SH_POST_INC_EXPR,
+	SH_DEC_EXPR,
+	SH_POST_DEC_EXPR,
+	SH_FIELD_ACCESS_EXPR,
+	SH_ADDRESS_OF_EXPR,
+	SH_ARRAY_EXPR,
+	SH_FUNC_EXPR,
+	SH_END_EXPR_TYPE
+} sh_expression_type ;
+
+
+char* expr_type_names[SH_END_EXPR_TYPE] = {
+	[ SH_UNKNOWN_EXPR ] = "unknown",
+	[ SH_INT_LITERAL ] = "integer",
+	[ SH_FLOAT_LITERAL ] = "float",
+	[ SH_STRING_LITERAL ] = "string",
+	[ SH_ARRAY_LITERAL ] = "array",
+	[ SH_STRUCT_LITERAL ] = "struct",
+	[ SH_NIL_LITERAL ] = "nil",
+	[ SH_FIELD_ASSIGNMENT_EXPR ] = "field assignment",
+	[ SH_ID_EXPR ] = "ID expr", // nothing must remain as ID? 
+	[ SH_VAR_EXPR ] = "var expr",
+
+	[ SH_PTR_DEREF_EXPR ] = "ptr deref",
+	[ SH_OPERATOR_EXPR ] = "operator expr",
+
+	[ SH_INC_EXPR ] = "prefix inc",
+	[ SH_POST_INC_EXPR ] = "suffix inc",
+	[ SH_DEC_EXPR ] = "prefix dec",
+	[ SH_POST_DEC_EXPR ] = "postfix dec",
+	[ SH_FIELD_ACCESS_EXPR ] = "field access",
+	[ SH_ADDRESS_OF_EXPR ] = "address of",
+	[ SH_ARRAY_EXPR ] = "array expr",
+	[ SH_FUNC_EXPR ] = "func expr"
+} ;
+
+
+
+
+typedef sh_token_base_type sh_expr_operator;
+
+typedef struct sh_expression {
+	sh_expression_type type;
+	char* name; // varname
+	i32 name_len;
+
+	union {
+
+		struct { //int literal
+			union {
+				i8  vi8;
+				i16 vi16;
+				i32 vi32;
+				i64 vi64;
+
+				u8 	vu8;
+				u16 vu16;
+				u32 vu32;
+				u64 vu64;
+
+				f32 vf32;
+				f64 vf64;
+			};
+		};
+
+
+		struct { 
+			sh_decl *var_decl;
+		};
+
+		struct { //string literal
+			char *str_val;
+			i32 str_size;
+		};
+
+		struct {
+			sh_expression *operand;
+		};
+
+		struct { 
+			sh_expr_operator op;
+			sh_expression *left_op;
+			sh_expression *right_op;
+		};
+
+		struct { // function
+			sh_expression *func_expr;
+			sh_expression **args;
+		};
+
+
+		//array
+		struct {
+			sh_expression **values;
+		};
+
+		struct { 
+			sh_expression *array_expr;
+			sh_expression *array_index_expr;
+		};
+
+		struct { // struct literal ? 
+			sh_expression **fields;
+		};
+
+		struct { // field assignment expr
+			sh_expression* left;
+			sh_expression* right;
+		};
+
+		struct { 
+			sh_token_base_type access_type; // either -> or .
+			sh_expression *pointer_expr;
+			sh_expression *field_access;
+		};
+
+	};
+
+} sh_expression ;
+
+char* get_expr_type_string(sh_expression *expr) {
+	return expr_type_names[expr->type];
+}
+
+
+
 i32 sh_find_struct_field_index(sh_type *type, char *name, i32 name_len) {
 	assert_exit(type->is_struct, "Type is not struct");
 	sh_decl **fields = type->struct_type.fields;
@@ -149,6 +394,36 @@ i32 sh_find_struct_field_index(sh_type *type, char *name, i32 name_len) {
 
 	return -1;
 }
+
+
+i32 sh_get_struct_field_offset(sh_type *type, char *name, i32 name_len) {
+	assert_exit(type->is_struct, "Type is not struct");
+	sh_decl **fields = type->struct_type.fields;
+	for(i32 i = 0; i < buf_len(fields); i++ ) {
+		sh_decl *field = fields[i];
+		if(field->name_len == name_len && strncmp(field->name, name, name_len) == 0 ) {
+			return field->struct_field.offset;
+		}
+	}
+
+	return -1;
+}
+
+sh_decl* sh_get_struct_field_name(sh_type *type, char *name, i32 name_len) {
+	assert_exit(type->is_struct, "Type is not struct");
+	sh_decl **fields = type->struct_type.fields;
+	for(i32 i = 0; i < buf_len(fields); i++ ) {
+		sh_decl *field = fields[i];
+		if(field->name_len == name_len && strncmp(field->name, name, name_len) == 0 ) {
+			return field;
+		}
+	}
+
+	return NULL;
+}
+
+
+
 
 
 f64 parse_float_token(sh_token *tok) {
@@ -234,6 +509,14 @@ sh_decl* sh_new_decl(sh_decl_type type) {
 	return decl;
 }
 
+sh_decl_tag* sh_new_decl_tag(sh_tag_type tag_type) {
+	sh_decl_tag *tag = (sh_decl_tag*) calloc(1, sizeof(sh_decl_tag));
+	tag->type = tag_type;
+	return tag;
+}
+
+
+
 sh_typespec* sh_new_base_typespec(sh_type_kind type, sh_type *base_type) {
 	sh_typespec *new_typespec = (sh_typespec*) calloc(1, sizeof(sh_typespec));
 	new_typespec->type = type;
@@ -265,7 +548,11 @@ sh_typespec* parse_type() {
 				sh_next_token();
 				type = sh_new_typespec(SH_TYPE_ARRAY, type);
 				if(!is_token(SH_CLOSE_BRACKET)) {
-					type->array_size_expr = sh_parse_expression();
+					//@Todo: this size should be constant
+					type->array_size_expr = sh_expr_int_literal();
+					type->array_count = type->array_size_expr->vi32;
+					type->size_byte = type->base->size_byte*type->array_count;
+					sh_next_token();
 				} else {
 					type->array_size_expr = NULL;
 				}
@@ -275,7 +562,12 @@ sh_typespec* parse_type() {
 
 			case SH_ASTERISK: {
 				type = sh_new_typespec(SH_TYPE_PTR, type);
+				type->size_byte = 8;
 				sh_next_token();
+			} break;
+
+			default: {
+				assert_exit(false, "Wrong type construct");
 			} break;
 		}
 	}
@@ -298,18 +590,23 @@ sh_decl** sh_parse_func_arg_list(void) {
 	sh_decl **args = NULL;
 
 	do {
-		buf_push(args, sh_parse_var_decl());
+		sh_decl *v = sh_parse_var_decl(SH_LOCAL_STORAGE);
+		buf_push(args, v);
+		buf_push(decls, v);
 	} while(expect_token(SH_COMMA));
 
 	return args;
 }
 
 
-sh_decl* sh_parse_var_decl() {
+sh_decl* sh_parse_var_decl(sh_storage_type storage) {
 	assert(is_token(SH_IDENTIFIER));
 
 	sh_decl *var_decl = sh_new_decl(SH_VAR_DECL);
 	var_decl->var.type = parse_type();
+	var_decl->storage = storage;
+
+	var_decl->total_size = var_decl->var.type->size_byte;
 
 	assert(is_token(SH_IDENTIFIER));
 
@@ -317,8 +614,8 @@ sh_decl* sh_parse_var_decl() {
 	var_decl->name_len = current_token->name_len;
 	sh_next_token();
 
-
-
+	//@Note/Todo: parser can probably infer the size of the array from the init_expr if 
+	//array size expr is not given 
 	if(expect_token('=')) {
 		var_decl->var.init_expr = sh_parse_expression();
 	}
@@ -344,9 +641,19 @@ sh_decl* sh_parse_func_decl() {
 
 	assert(expect_token(')'));
 
-	assert(is_token('{')); // can be just a forward decl? 
+	i32 has_body = is_token('{');
 
-	decl->func.compound_statement = sh_parse_compound_statement();
+	
+	if(has_body) {
+		has_func_call = 0;
+		decl->func.compound_statement = sh_parse_compound_statement();// is there a func call here? 
+		decl->total_size = decl->func.compound_statement->stmt_size;
+		if(has_func_call == 1) {
+			decl->total_size += 32 + 8 ; //maybe? 
+		}
+	} else {
+		assert_exit(expect_token(SH_SEMI_COLON), "expected ; got %s\n", current_token->name);
+	}
 
 
 	return decl;
@@ -382,6 +689,7 @@ sh_decl* sh_parse_struct_field_decl() {
 	assert_exit(is_type(current_token), "Excected a type got %s\n", current_token->name);
 
 	sh_decl *new_decl = sh_new_decl(SH_STRUCT_FIELD_DECL);
+	new_decl->storage = SH_LOCAL_STORAGE;
 
 	new_decl->struct_field.type = parse_type();
 	new_decl->name = current_token->name;
@@ -398,22 +706,27 @@ sh_decl* sh_parse_struct_decl() {
 	sh_decl* decl = sh_new_decl(SH_STRUCT_DECL);
 
 	decl->name = current_token->name;
+	decl->name_len = current_token->name_len;
 
 	sh_type *new_type = (sh_type*) calloc(1, sizeof(sh_type));
 	new_type->is_struct = 1;
 	new_type->name = current_token->name;
 	new_type->name_len = current_token->name_len;
 
-
 	sh_next_token();
 	assert(expect_token('{'));
+	i32 field_offset = 0;
 	while(!is_token('}')) {
 		sh_decl *field = sh_parse_struct_field_decl();
+		field->struct_field.offset = field_offset;
+		field_offset += field->struct_field.type->size_byte; // offset and size are the same? 
 		buf_push(decl->struct_decl.fields, field);
 		assert(expect_token(';'));
 	}
 	
 	new_type->struct_type.fields = decl->struct_decl.fields;
+	decl->total_size = field_offset;
+	new_type->size_byte = field_offset;
 	buf_push(type_table, new_type);
 	assert(expect_token('}'));
 	/* assert(expect_token(';')); */
@@ -422,21 +735,97 @@ sh_decl* sh_parse_struct_decl() {
 }
 
 
+sh_decl_tag *sh_parse_dll_import() {
+
+	sh_decl_tag *tag = sh_new_decl_tag(SH_DLL_IMPORT_TAG);
+
+	assert_exit(expect_token(SH_OPEN_PARAN), "Expected ( got %s\n", current_token->name);
+
+	sh_token **dll_name = NULL;
+
+	i32 len = current_token->name_len;
+	while(!expect_token(SH_COMMA)) {
+		len += current_token->name_len;
+		buf_push(dll_name, current_token);
+		sh_next_token();
+	}
+
+	char *name = (char*)calloc(len+1, sizeof(char));
+
+	for(int i = 0; i < buf_len(dll_name); i++) {
+		strncat(name, dll_name[i]->name, dll_name[i]->name_len);
+	}
+
+	buf_free(dll_name);
+
+
+	char *func_name = current_token->name;
+
+	//@Todo: compute file path? maybe? current dir if nothing is attached etc
+	tag->dll.dll_file_path = name;
+	tag->dll.func_name = func_name;
+
+	sh_next_token();
+	assert_exit(expect_token(SH_CLOSE_PARAN), "Expected ) got %s\n", current_token->name );
+
+	return tag;
+}
+
+sh_decl_tag *sh_parse_var_import() {
+
+	sh_decl_tag *tag = sh_new_decl_tag(SH_VAR_IMPORT_TAG);
+
+	assert_exit(expect_token(SH_OPEN_PARAN), "Expected ( got %s\n", current_token->name);
+
+	tag->var.var_name = current_token->name;
+
+	assert_exit(expect_token(SH_IDENTIFIER), "expected identifier got %s\n", current_token->name);
+	
+	assert_exit(expect_token(SH_CLOSE_PARAN), "Expected ) got %s\n", current_token->name );
+
+	return tag;
+}
+
+sh_decl_tag* sh_parse_decl_tag() {
+
+	sh_decl_tag *tag = NULL;
+
+	if(expect_keyword(&dll_import)) {
+		tag = sh_parse_dll_import();
+	} else if(expect_keyword(&var_import)) {
+		tag = sh_parse_var_import();
+	}
+
+	if(tag == NULL) {
+		puts("unhandled import.");
+	}
+
+	return tag;
+}
+
 void parse_file() {
 
 	while(current_token->type.base != SH_END_FILE) {
 
 		sh_decl* decl = NULL;
+		sh_decl_tag *tag = NULL;
 
 		sh_token *token_start = current_token;
 
+		if(expect_token(SH_AT)) {
+			tag = sh_parse_decl_tag();
+			token_start = current_token;
+		}
+
+		
 		if(is_type(current_token)) {
 
-			decl = sh_parse_var_decl();
+			decl = sh_parse_var_decl(SH_GLOBAL_STORAGE);
 
 			if(expect_token(SH_OPEN_PARAN)) {
 				current_token = token_start;
 				decl = sh_parse_func_decl();
+				decl->storage = SH_GLOBAL_STORAGE;
 			} else {
 				assert(expect_token(';'));
 			}
@@ -451,6 +840,9 @@ void parse_file() {
 			assert_exit(false, "unexpected token %s\n", current_token->name);
 		}
 
+		if(tag) {
+			buf_push(decl->tags, tag);
+		}
 
 		buf_push(decls, decl);
 	}
@@ -466,9 +858,11 @@ char* sh_print_typespec(sh_typespec *type) {
 
 		case SH_TYPE_ARRAY: {
 			at += copy_and_free(buffer + at, sh_print_typespec(type->base));
-			char *str = sh_print_expr(type->array_size_expr);
-			at += sprintf(buffer + at, "[%s]", str);
-			free(str);
+			at += sprintf(buffer + at, "[");
+			if(type->array_size_expr) {
+				at += copy_and_free(buffer + at, sh_print_expr(type->array_size_expr));
+			}
+			at += sprintf(buffer + at, "]");
 		} break;
 
 		case SH_TYPE_PTR: {
@@ -570,136 +964,13 @@ char* sh_print_decl(sh_decl *decl) {
 		case SH_FUNC_DECL: { return sh_print_func_decl(decl); } break;
 		case SH_TYPEDEF_DECL: { return sh_print_typedef_decl(decl); } break;
 		case SH_STRUCT_DECL: { return sh_print_struct_decl(decl); } break;
+		default: return "unknown decl";
 	}
 
 	return NULL;
 }
 
 
-// ======================================== 
-
-// expressions
-typedef enum sh_expression_type {
-	SH_UNKNOWN_EXPR,
-	SH_INT_LITERAL,
-	SH_FLOAT_LITERAL,
-	SH_STRING_LITERAL,
-	SH_ARRAY_LITERAL,
-	SH_STRUCT_LITERAL,
-	SH_NIL_LITERAL,
-	SH_FIELD_ASSIGNMENT_EXPR,
-	SH_ID_EXPR, // nothing must remain as ID? 
-	SH_VAR_EXPR,
-
-	SH_PTR_DEREF_EXPR,
-
-	SH_OPERATOR_EXPR,
-
-	SH_INC_EXPR,
-	SH_POST_INC_EXPR,
-	SH_DEC_EXPR,
-	SH_POST_DEC_EXPR,
-	SH_FIELD_ACCESS_EXPR,
-	SH_ADDRESS_OF_EXPR,
-	SH_ARRAY_EXPR,
-	SH_FUNC_EXPR
-} sh_expression_type ;
-
-
-// lex -> parsing - > type checking -> ( code generation | VM ) -> interpreter  -> text editor (code) 
-//                                  	-> VM -> 
-
-typedef sh_token_base_type sh_expr_operator;
-
-/* typedef enum sh_expr_operator { */
-/* 	SH_ADD_OP = '+', */
-/* 	SH_SUB_OP = '-', */
-/* 	SH_MUL_OP = '*', */
-/* 	SH_GRET_OP = '>', */
-/* 	SH_LESS_OP = '<', */
-/* 	SH_EQL_OP, // '==' */
-/* 	SH_NEQ_OP, // '!=' */
-/*  */
-/* } sh_expr_operator; */
-
-
-typedef struct sh_expression {
-	sh_expression_type type;
-	char* name; // varname
-	i32 name_len;
-
-	union {
-
-		struct { //int literal
-			union {
-				i8  vi8;
-				i16 vi16;
-				i32 vi32;
-				i64 vi64;
-
-				u8 	vu8;
-				u16 vu16;
-				u32 vu32;
-				u64 vu64;
-
-				f32 vf32;
-				f64 vf64;
-			};
-		};
-
-
-		struct { 
-			sh_decl *var_decl;
-		};
-
-		struct { //string literal
-			char *str_val;
-			i32 str_size;
-		};
-
-		struct {
-			sh_expression *operand;
-		};
-
-		struct { 
-			sh_expr_operator op;
-			sh_expression *left_op;
-			sh_expression *right_op;
-		};
-
-		struct { // function
-			sh_expression *func_expr;
-			sh_expression **args;
-		};
-
-
-		struct {
-			sh_expression **values;
-		};
-
-		struct { 
-			sh_expression *array_expr;
-			sh_expression *array_index_expr;
-		};
-
-		struct { // struct literal ? 
-			sh_expression **fields;
-		};
-
-		struct { // field assignment expr
-			sh_expression* left;
-			sh_expression* right;
-		};
-
-		struct { 
-			sh_token_base_type access_type; // either -> or .
-			sh_expression *pointer_expr;
-			sh_expression *field_access;
-		};
-
-	};
-
-} sh_expression ;
 
 
 sh_expression* sh_new_int_literal_expr(i64 val) { 
@@ -854,7 +1125,7 @@ sh_expression* sh_array_index_expr(void) {
 
 sh_expression* sh_parse_ptr_deref(void) {
 	assert(expect_token(SH_ASTERISK));
-	sh_expression *new_expr = sh_new_unary_expr(SH_PTR_DEREF_EXPR, sh_parse_base_expr());
+	sh_expression *new_expr = sh_new_unary_expr(SH_PTR_DEREF_EXPR, sh_parse_unary_expr());
 	return new_expr;
 }
 
@@ -864,6 +1135,14 @@ sh_expression* sh_parse_address_of_expr(void) {
 	return new_expr;
 }
 
+
+sh_expression* sh_parse_field_name(void) {
+	assert(is_token(SH_IDENTIFIER));
+	sh_expression *new_expr = NULL;
+	new_expr = sh_new_id_expr(current_token);
+	sh_next_token();
+	return new_expr;
+}
 
 sh_expression* sh_parse_id_expr(void) {
 	assert(is_token(SH_IDENTIFIER));
@@ -875,12 +1154,12 @@ sh_expression* sh_parse_id_expr(void) {
 		new_expr =  sh_new_nil_literal_expr();
 	} else {
 		new_expr = sh_new_id_expr(current_token);
+		sh_decl *decl = sh_get_decl(current_token->name, current_token->name_len);
+		assert_exit(decl != NULL, "Cannot find identifier %s\n", current_token->name);
+		new_expr->var_decl = decl;
 	}
 
-	sh_decl *decl = sh_get_decl(current_token->name, current_token->name_len);
-	assert_exit(decl != NULL, "Cannot find identifier %s\n", decl->name);
-	new_expr->var_decl = decl;
-
+	
 	sh_next_token();
 
 	return new_expr;
@@ -894,7 +1173,7 @@ sh_expression* sh_parse_assignment_expr(void) {
 	);
 
 	sh_expression *assignment_expr = sh_new_expr(SH_FIELD_ASSIGNMENT_EXPR);
-	assignment_expr->left = sh_parse_expression();
+	assignment_expr->left = sh_parse_field_name();
 
 	assert_exit(expect_token(SH_ASSIGNMENT), "Expected '=' got %s\n", current_token->name);
 
@@ -1016,6 +1295,7 @@ sh_expression* sh_parse_base() {
 			} break;
 			case '(': {
 				new_expr = sh_new_function_call_expr(new_expr, sh_parse_function_params());
+				has_func_call = 1;
 				expect_token(')');
 			} break;
 
@@ -1023,7 +1303,7 @@ sh_expression* sh_parse_base() {
 			case SH_POINTER_ACCESS: {
 				sh_token_base_type type = current_token->type.base;
 				sh_next_token();
-				new_expr = sh_new_field_access_expr(new_expr, sh_parse_id_expr());
+				new_expr = sh_new_field_access_expr(new_expr, sh_parse_field_name());
 				new_expr->access_type = type;
 			} break;
 			case SH_INCREMENT: {
@@ -1064,6 +1344,10 @@ sh_expression* sh_parse_unary_expr() {
 		} break;
 		case SH_DECREMENT: {
 			return sh_parse_decrement();
+		} break;
+
+		default: {
+			// we move on
 		} break;
 	}
 
@@ -1228,69 +1512,6 @@ sh_expression* sh_parse_expression() {
 }
 
 
-// statement related stuff 
-
-typedef enum sh_statement_type {
-	
-	SH_INITIALIZED_STATEMENT,
-	SH_COMPOUND_STATEMENT,
-	SH_VAR_DECL_STATEMENT,
-	SH_ASSIGNMENT_STATEMENT,
-	SH_INC_DEC_STATEMENT,
-	/* SH_DEC_STATEMENT, */
-	SH_FOR_STATEMENT,
-	SH_WHILE_STATEMENT,
-	SH_IF_STATEMENT,
-	SH_ELIF_STATEMENT,
-	SH_ELSE_STATEMENT,
-	SH_RETURN_STATEMENT,
-	SH_BREAK_STATEMENT,
-	SH_CONTINUE_STATEMENT,
-	SH_FUNC_CALL_STATEMENT,
-
-} sh_statement_type;
-
-
-typedef struct sh_statement {
-	sh_statement_type type;
-
-	union {
-
-		struct {
-			sh_decl *var_decl;
-		};
-
-		struct {
-			sh_expression *unary_expr;
-		};
-
-		struct {
-			sh_expression *left_side_expr;
-			sh_expression *right_side_expr;
-		};//assignment operator;
-
-		struct {
-			sh_statement *init_statement;
-			sh_expression *condition_expr;
-			sh_expression *post_loop_expr;
-			sh_statement  *comp_statement;
-
-			sh_statement **elseif_stmts;
-			sh_statement *else_stmt;
-		}; // 
-
-		struct { //return
-			sh_expression *ret_expr;
-		};
-
-		struct {
-			sh_statement **statements;
-		};
-	};
-
-} sh_statement;
-
-
 sh_statement* sh_parse_for_statement() {
 	assert(expect_keyword(&for_keyword));
 
@@ -1302,6 +1523,7 @@ sh_statement* sh_parse_for_statement() {
 	if(!is_token(';')) {
 		// init-statement
 		for_statement->init_statement = sh_parse_statement();
+		for_statement->stmt_size += for_statement->init_statement->stmt_size;
 	} else {
 		expect_token(';');
 	}
@@ -1313,7 +1535,8 @@ sh_statement* sh_parse_for_statement() {
 	expect_token(';');
 
 	if(!is_token(')')) {
-		for_statement->post_loop_expr = sh_parse_expression();
+		for_statement->post_loop_expr = sh_parse_statement();
+		for_statement->stmt_size += for_statement->post_loop_expr->stmt_size;
 	}
 
 	assert(expect_token(')'));
@@ -1321,6 +1544,7 @@ sh_statement* sh_parse_for_statement() {
 	if(is_token('{')) {
 		// loop body
 		for_statement->comp_statement = sh_parse_compound_statement();
+		for_statement->stmt_size += for_statement->comp_statement->stmt_size;
 	}
 
 
@@ -1364,12 +1588,17 @@ sh_statement* sh_parse_if_statement() {
 	assert(expect_token(')'));
 	if_statement->comp_statement = sh_parse_compound_statement();
 
+	if_statement->stmt_size = if_statement->comp_statement->stmt_size;
+
 	while(is_keyword(&elif_keyword)) {
-		buf_push(if_statement->elseif_stmts, sh_parse_elif_statement());
+		sh_statement *elif_stmt = sh_parse_elif_statement();
+		if_statement->stmt_size += elif_stmt->stmt_size;
+		buf_push(if_statement->elseif_stmts, elif_stmt);
 	}
 
 	if(expect_keyword(&else_keyword)) {
 		if_statement->else_stmt = sh_parse_compound_statement();
+		if_statement->stmt_size += if_statement->else_stmt->stmt_size;
 	}
 	
 
@@ -1399,6 +1628,7 @@ sh_statement* sh_parse_continue_statement() {
 	return continue_statement;
 }
 
+//@Todo: maybe break out of multiple places:
 sh_statement* sh_parse_break_statement() {
 	assert(expect_keyword(&break_keyword));
 
@@ -1417,12 +1647,14 @@ sh_statement* sh_parse_statement() {
 
 	while(expect_token(SH_COMMENT));
 	
-	sh_statement *new_statement = (sh_statement*) calloc(1, sizeof(sh_statement));
+
+	sh_statement *new_statement = (sh_statement*) calloc(1, sizeof(sh_statement)); // all sizes are zero
 
 	if(is_type(current_token)) {
 		new_statement->type = SH_VAR_DECL_STATEMENT;
-		new_statement->var_decl = sh_parse_var_decl();
-		/* buf_push(decls, new_statement->var_decl); */
+		new_statement->var_decl = sh_parse_var_decl(SH_LOCAL_STORAGE);
+		new_statement->stmt_size = new_statement->var_decl->total_size;
+		buf_push(decls, new_statement->var_decl);
 		assert(expect_token(';'));
 	} else if(is_keyword(&for_keyword)) {
 		new_statement = sh_parse_for_statement();
@@ -1435,8 +1667,10 @@ sh_statement* sh_parse_statement() {
 		assert(expect_token(';'));
 	} else if(is_keyword(&break_keyword)) {
 		new_statement = sh_parse_break_statement();
+		assert(expect_token(';'));
 	} else if(is_keyword(&continue_keyword)) {
 		new_statement = sh_parse_continue_statement();
+		assert(expect_token(';'));
 	} else {
 		sh_expression *parsed_expr = sh_parse_expression();
 
@@ -1454,10 +1688,12 @@ sh_statement* sh_parse_statement() {
 			new_statement->unary_expr = parsed_expr;
 		}
 
-		assert(expect_token(';'));
 
+		// @Todo: this is bad juju
+		expect_token(';');
 	}
 
+	
 
 	return new_statement;
 }
@@ -1471,12 +1707,15 @@ sh_statement* sh_parse_compound_statement() {
 
 	while(expect_token(SH_COMMENT));
 
+	i32 stmt_size = 0;
 	while(!is_token('}')) {
 		sh_statement *stmt = sh_parse_statement();
+		stmt_size += stmt->stmt_size;
 		buf_push(new_statement->statements, stmt);
 	}
 
 	assert(expect_token('}'));
+	new_statement->stmt_size = stmt_size;
 
 	return new_statement;
 }
@@ -1595,7 +1834,7 @@ char* sh_print_statement(sh_statement *stmt) {
 				indent_level++;
 				at += sh_print_indent(BUFFER_AT);
 				ADD_TO_BUFFER("post loop: ");
-				COPY_TO_BUFFER(sh_print_expr(stmt->post_loop_expr));
+				COPY_TO_BUFFER(sh_print_statement(stmt->post_loop_expr));
 				ADD_TO_BUFFER("\n");
 				indent_level--;
 			}

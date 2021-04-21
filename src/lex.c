@@ -42,7 +42,8 @@ void sh_tokenize() {
 			main_token.type.base = SH_STRING;
 			main_token.name = (char *) calloc(str_len + 1, sizeof(char));
 			memcpy(main_token.name, str_start, str_len);
-			/* main_token.name[str_len] = 0; */
+			main_token.name[str_len] = 0;
+			main_token.name_len = str_len + 1;
 			main_source++;
 		} break;
 
@@ -201,6 +202,7 @@ void sh_tokenize() {
 		} break;
 
 
+		case '@':
 		case ',':
 		case '?':
 		case '(':

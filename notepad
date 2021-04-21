@@ -1,3 +1,189 @@
+
+move
+
+mem
+reg
+
+
+mem => scale + index + base + disp32
+
+
+if mem+sib
+	modrm => jk
+
+
+
+
+mov
+left - stack, register, memory
+right - satck, register, memory
+
+ 				stack 							reg 		mem		imm?
+ left
+
+ stack  	
+
+
+ reg		
+
+
+ mem		
+
+
+ imm?
+
+
+
+
+
+
+
+
+
+
+ops reduction: 
+
+add  (no three op, result)
+ left op
+ right op
+
+ always result = left + right
+
+ left = left + right
+
+
+(immediate? cannot be immediate, but we load all immediates into register?) 
+maybe this is wrong, save one move for immediate value? 
+
+
+- should add op be responsible for the store back to location?
+	currently it is
+
+left - stack, register, memory
+right - satck, register, memory
+
+ 				stack 							reg 		mem		imm?
+ left
+ stack  	mov left to reg first	  	 
+ 			add from stack
+			(mov reg, stack)
+			( add reg, stack )
+
+
+ reg		add stack to reg
+
+
+ mem		mov mem to reg
+
+
+ imm?
+
+
+
+ both stack and mem are just mem movs, difference is SIB and ModRM
+
+ mov reg, mem, stack - diff only in ModRM and SIB? 
+ 	- if we choose mov for left op be 
+
+
+
+i32 foo = 1;
+mov foo, 1
+
+foo = foo + 2 => add foo, 2
+
+
+i32 foo = (1 + 5*2) + 2;
+
+could be this: 
+mov foo, 1
+add foo, 2
+
+compared to  this
+
+mov reg, foo
+add reg, 2
+mov foo, reg
+
+--
+
+i32 foo = (1 + 5*2) + 2;
+
+
+this 
+mov foo, 1
+mov reg, 5
+mul reg, 2
+add foo, reg
+add foo, 2
+
+compared to
+
+
+mov reg1, 1
+mov reg2, 5
+mul reg2, 2
+add reg1, reg2
+mov reg2, 2
+add reg1, reg2
+mov foo, reg1
+
+--
+
+i32 foo = 5;
+
+foo = foo*foo + foo;
+
+mov reg, foo
+mul reg, reg
+add reg, foo
+mov foo, reg
+
+
+// can we recursively know that a value of the stack has been loaded into a register?
+
+
+============================================================
+
+
+
+tomorrow todo: 
+-- calls with params -> stack
+	- store some vars (rcx, rdx, r8, r9)
+-- local variables -> assigned on stack
+
+
+
+
+
+if cond = cmp 5, 2
+cmp eax, 1?
+jneq
+{
+	next_label <- // jump next if or else? 
+	..do if .. body
+	..jmp end...
+} // next label pos = size of generated body? 
+
+next_lbl: elif: ( 1 > 2 )
+
+jneq
+{
+	next_label <- // jump next if or else? 
+	..do if .. body
+	..jmp end...
+}
+
+next_lbl: else:
+..else body..
+
+end  --  end of stmt
+.....
+
+
+
+
+===============================================================
 x64 calling convention
 
 

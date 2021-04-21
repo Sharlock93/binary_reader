@@ -27,6 +27,7 @@ typedef struct bhdr {
 #define buf_cap(b) ((b) ? buf__hdr(b)->cap: 0)
 #define buf_fit(b, n) ((n) <= buf_cap(b) ? 0 : ((b) = buf__grow(b, buf_len(b) + (n), sizeof(*(b)))))
 #define buf_push(b, ...) ( buf_fit((b), 1 + buf_len(b)), (b)[buf__hdr(b)->size++] = (__VA_ARGS__))
+#define buf_pop(b)		 ( buf_len(b) ? ((b) + --buf__hdr(b)->size) : NULL )
 #define buf_free(b) ((b) ? (free(buf__hdr(b)), (b) = NULL): 0)
 #define buf_clear(b) ((b) ? buf__hdr(b)->size = 0: 0)
 
@@ -44,6 +45,7 @@ void* buf__grow(void *buf, int items, int item_size) {
 	nhdr->cap = new_cap;
 	return ((int*)nhdr) + 2;
 }
+
 
 FILETIME sh_get_file_last_write(char *filename) {
 	WIN32_FILE_ATTRIBUTE_DATA file_attrib;
@@ -126,15 +128,23 @@ void write_file(const char *filename, char *to_write, i32 to_write_bytes) {
 
 
 
-void assert_exit(i32 assert_condition, char *fmt, ...) {
+#define assert_exit(assert_condition, fmt, ...) \
+	_assert_exit(assert_condition, __LINE__, __FILE__, __func__, fmt, __VA_ARGS__)
+
+void _assert_exit(i32 assert_condition, i32 line_number, const char *file, const char *func, const char *fmt, ...) {
 
 	if(!assert_condition) {
 		va_list var_list;
 		va_start(var_list, fmt);
+		printf("%s(%d): ", file, line_number);
 		vprintf(fmt, var_list);
 		va_end(var_list);
 		exit(1);
 	}
 }
+
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 #endif

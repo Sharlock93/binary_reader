@@ -53,7 +53,8 @@ typedef enum sh_token_base_type {
 	SH_DECREMENT,
 	SH_POINTER_ACCESS,
 
-	SH_COMMENT
+	SH_COMMENT,
+	SH_AT = '@'
 
 } sh_token_base_type;
 
@@ -104,6 +105,8 @@ char *base_type_names[] = {
 	[SH_OR] = "||",
 	[SH_COMMENT] = "//",
 	[SH_DOT_OPERATOR] = ".",
+
+	[SH_AT] = "@",
 
 	[SH_END_FILE] = "eof"
 };

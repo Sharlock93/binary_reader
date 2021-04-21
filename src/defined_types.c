@@ -49,7 +49,6 @@ sh_keyword *keyword_table = NULL;
 sh_type sh_type_i8 = { .size_byte = 1, .name_len = 2, .name = "i8"};
 sh_type sh_type_u8 = { .size_byte = 1, .name_len = 2, .name = "u8"};
 
-
 sh_type sh_type_i16 = { .size_byte = 2, .name_len = 3, .name = "i16"};
 sh_type sh_type_u16 = { .size_byte = 2, .name_len = 3, .name = "u16"};
 
@@ -71,15 +70,15 @@ sh_type sh_type_u32be = { .size_byte = 4, .name_len = 5, .name = "u32be"};
 sh_type sh_type_i64be = { .size_byte = 8, .name_len = 5, .name = "i64be"};
 sh_type sh_type_u64be = { .size_byte = 8, .name_len = 5, .name = "u64be"};
 
-sh_type sh_type_char = { .size_byte = 0, .name_len = 4, .name = "char"};
+sh_type sh_type_char = { .size_byte = 1, .name_len = 4, .name = "char"};
 sh_type sh_type_string = { .size_byte = 0, .name_len = 6, .name = "string"};
 
 sh_type sh_type_void = { .size_byte = 0, .name_len = 4, .name = "void"};
 
-sh_type sh_type_f32 = { .size_byte = 0, .name_len = 3, .name = "f32"};
-sh_type sh_type_f64 = { .size_byte = 0, .name_len = 3, .name = "f64"};
+sh_type sh_type_f32 = { .size_byte = 4, .name_len = 3, .name = "f32"};
+sh_type sh_type_f64 = { .size_byte = 8, .name_len = 3, .name = "f64"};
 
-sh_type sh_type_nil = { .size_byte = 0, .name_len = 3, .name = "nil"};
+sh_type sh_type_nil = { .size_byte = 8, .name_len = 3, .name = "nil"};
 
 void setup_internal_types() {
 
@@ -127,6 +126,14 @@ sh_keyword return_keyword = { .name = "return", .name_len = 6 };
 sh_keyword continue_keyword = { .name = "continue", .name_len = 8 };
 sh_keyword nil_keyword = { .name = "nil", .name_len = 3 };
 
+sh_keyword dll_import = { .name = "dll_import", .name_len = 10 };
+sh_keyword var_import = { .name = "var_import", .name_len = 10 };
+
+/*
+sh_keyword dll_import = { .name = "stdout", .name_len = 6 };
+sh_keyword dll_import = { .name = "stdin", .name_len = 5 };
+*/
+
 void setup_keywords() {
 
 	buf_push(keyword_table, typedef_keyword);
@@ -141,6 +148,8 @@ void setup_keywords() {
 	buf_push(keyword_table, break_keyword);
 	buf_push(keyword_table, return_keyword);
 	buf_push(keyword_table, nil_keyword);
+
+	buf_push(keyword_table, dll_import);
 }
 
 

@@ -25,6 +25,51 @@ typedef struct sh_semantic_type {
 
 } sh_semantic_type;
 
+i8 is_int(sh_type *t) {
+	i8 is_eq = 0;
+	for(sh_type** i = type_table; i[0] != &sh_type_u64be; i++ ) {
+		if(t == i[0]) {
+			is_eq = 1;
+			break;
+		}
+	}
+
+	return is_eq;
+}
+
+i8 is_float(sh_type *t) {
+	return t == &sh_type_f32 || t == &sh_type_f64;
+}
+
+i8 is_ptr(sh_semantic_type *t) { return t->is_ptr; }
+i8 is_defined_type(sh_semantic_type *t) { return t->base_type->type == SH_TYPE_DEFINED_TYPE; }
+i8 is_int_type(sh_semantic_type *t) { return is_defined_type(t) && is_int(t->base_type->base_type); }
+i8 is_float_type(sh_semantic_type *t) { return is_defined_type(t) && is_float(t->base_type->base_type); }
+
+i8 is_numeric_type(sh_semantic_type *t){ return is_int_type(t) || is_float_type(t); }
+
+i8 is_typespec_ptr(sh_typespec *t) { return t->type == SH_TYPE_PTR; }
+i8 is_typespec_defined_type(sh_typespec *t) { return t->type == SH_TYPE_DEFINED_TYPE; }
+i8 is_typespec_int_type(sh_typespec *t) { return is_typespec_defined_type(t) && is_int(t->base_type); }
+i8 is_typespec_float_type(sh_typespec *t) { return is_typespec_defined_type(t) && is_float(t->base_type); }
+i8 is_typespec_struct(sh_typespec *type){ return type->type == SH_TYPE_DEFINED_TYPE && type->base_type->is_struct == 1; }
+i8 is_typespec_array(sh_typespec *type) { return type->type == SH_TYPE_ARRAY; }
+i8 is_typespec_nil(sh_typespec *t) { return is_typespec_defined_type(t) && t->base_type == &sh_type_nil; }
+
+i8 is_dll_import(sh_decl *decl) {
+	if(decl->tags) {
+		sh_decl_tag **t = decl->tags;
+		while(t != buf_end(decl->tags)) {
+			if(t[0]->type == SH_DLL_IMPORT_TAG || t[0]->type == SH_VAR_IMPORT_TAG)
+				return 1;
+
+			t++;
+		}
+
+	}
+
+	return 0;
+}
 
 sh_semantic_type* sh_new_semantic_type(sh_typespec *base_type) {
 	sh_semantic_type *t = (sh_semantic_type*)calloc(1, sizeof(sh_semantic_type));
@@ -60,19 +105,22 @@ sh_semantic_type* sh_new_int_literal(i64 int_val) {
 	sh_semantic_type* t = sh_new_semantic_type(
 			sh_new_base_typespec(SH_TYPE_DEFINED_TYPE, &sh_type_i32));
 	t->int_literal = int_val;
-	t->size_byte = sh_type_i64.size_byte;
+	//@Note: this might be needed or not? 
+	// t->size_byte = sh_type_i64.size_byte;
 	return t;
 }
 
-sh_semantic_type* sh_new_array_literal(sh_typespec* base_type, sh_expression *array_size_expr) {
+sh_semantic_type* sh_new_array_literal(sh_typespec* base_type, sh_expression *array_size_expr, i32 array_size) {
 	sh_semantic_type* t = sh_new_semantic_type( base_type);
 	t->base_type->array_size_expr = array_size_expr;
+	t->base_type->array_count = array_size;
+	t->array_size = array_size;
 	return t;
 }
 
 
 sh_semantic_type* sh_new_float_literal(f64 float_val) {
-	sh_semantic_type* t = sh_new_semantic_type( sh_new_base_typespec(SH_TYPE_DEFINED_TYPE, &sh_type_f32));
+	sh_semantic_type* t = sh_new_semantic_type( sh_new_base_typespec(SH_TYPE_DEFINED_TYPE, &sh_type_f64));
 	t->float_literal = float_val;
 	t->size_byte = sh_type_f64.size_byte;
 	return t;
@@ -107,19 +155,24 @@ sh_semantic_type* sh_type_check_struct_field(sh_type* type, char* name, i32 name
 i32 sh_semantic_type_equal(sh_semantic_type *a, sh_semantic_type *b) {
 	i32 is_equal = true;
 
-
 	sh_typespec *a_ts = a->base_type;
 	sh_typespec *b_ts = b->base_type;
 
+	//@Todo: weird? 
 	if(b->is_nil) {
-		if(a->is_ptr)
+		if(a->is_ptr || a->is_nil)
 			return 1;
 		else {
 			return 0;
 		}
 	}
 
+
+	
 	while(true) {
+		if(is_typespec_ptr(a_ts) && is_typespec_nil(b_ts) || is_typespec_ptr(b_ts) && is_typespec_nil(a_ts)) {
+			break;
+		} 
 
 		if(a_ts->type != b_ts->type) {
 			is_equal = false;
@@ -141,33 +194,39 @@ i32 sh_semantic_type_equal(sh_semantic_type *a, sh_semantic_type *b) {
 }
 
 
-
-
-
 sh_semantic_type* sh_type_check_array_literal_expr(sh_expression *expr, sh_semantic_type* type_check) {
-	sh_semantic_type *first_value = sh_type_check_expr(expr->values[0]);
 
-	for(sh_expression **exprs = expr->values+1; exprs != buf_end(expr->values); exprs++) {
+	sh_semantic_type *array_base_type = sh_new_semantic_type_typespec(type_check->base_type->base);
+
+	sh_semantic_type *first_val = sh_type_check_expr_with_type(expr->values[0], array_base_type);
+
+	for(sh_expression **exprs = expr->values; exprs != buf_end(expr->values); exprs++) {
 		sh_expression *e = exprs[0];
-		sh_semantic_type *sm_type = sh_type_check_expr(e);
+		sh_semantic_type *sm_type = sh_type_check_expr_with_type(e, first_val);
 
-		if(!sh_semantic_type_equal(first_value, sm_type)) {
-			printf("Array has mixed types all elems must be %s\n",
-					sh_print_typespec(first_value->base_type));
+		if(!sh_semantic_type_equal(first_val, sm_type)) {
+			printf("Array has mixed types all elems must be %s got type %s\n",
+					sh_print_typespec(type_check->base_type->base), sh_print_typespec(sm_type->base_type));
 			exit(0);
 		}
 
-		free(sm_type);
+		// free(sm_type);
 	}
 
-	sh_typespec* array_typespec = sh_new_typespec(SH_TYPE_ARRAY, first_value->base_type);
 
-	free(first_value);
+	sh_typespec* array_typespec = sh_new_typespec(SH_TYPE_ARRAY, first_val->base_type);
+
 
 	sh_semantic_type *st = sh_new_array_literal(
 			array_typespec,
-			sh_new_int_literal_expr(buf_len(expr->values))
+			sh_new_int_literal_expr(buf_len(expr->values)),
+			buf_len(expr->values)
 			);
+
+	st->base_type->size_byte = first_val->size_byte*st->array_size;
+	st->size_byte = st->base_type->size_byte;
+
+	free(first_val);
 
 	return st;
 }
@@ -261,7 +320,20 @@ sh_semantic_type* sh_type_check_operator_expr(sh_expression *expr, sh_semantic_t
 	sh_semantic_type *left_op = sh_type_check_expr(expr->left_op);
 	sh_semantic_type *right_op = sh_type_check_expr(expr->right_op);
 
-	if(!sh_semantic_type_equal(left_op, right_op)) {
+
+	i32 is_equal = sh_semantic_type_equal(left_op, right_op);
+
+
+	if(!is_equal) {
+		// wrong, should only be checked during expr
+		if(is_ptr(left_op) && is_int_type(right_op) || is_ptr(right_op) && is_int_type(left_op))
+			is_equal = 1;
+
+		if(is_numeric_type(left_op) && is_numeric_type(right_op)) {
+
+		}
+
+	} else {
 		char *left_type = sh_print_typespec(left_op->base_type);
 		char *right_type = sh_print_typespec(right_op->base_type);
 
@@ -299,7 +371,7 @@ sh_semantic_type* sh_type_check_array_expr(sh_expression* expr, sh_semantic_type
 				arr_expr, index_exp);
 		exit(1);
 	}
-	sh_semantic_type *t = sh_new_semantic_type(expr_type->base_type->base);
+	sh_semantic_type *t = sh_new_semantic_type_typespec(expr_type->base_type->base);
 	t->is_rvalue = 0;
 	return t;
 
@@ -376,7 +448,7 @@ sh_semantic_type* sh_type_check_expr_with_type(sh_expression* expr, sh_semantic_
 
 			assert_exit(t->is_ptr == 1, "Cannot dereference non-pointer type.");
 
-			sh_semantic_type *t_no_ptr = sh_new_semantic_type(t->base_type->base);
+			sh_semantic_type *t_no_ptr = sh_new_semantic_type_typespec(t->base_type->base);
 			t->is_rvalue = 0;
 			return t_no_ptr;
 		} break;
@@ -410,7 +482,9 @@ sh_semantic_type* sh_type_check_expr_with_type(sh_expression* expr, sh_semantic_
 		case SH_ADDRESS_OF_EXPR: {
 			sh_semantic_type *t = sh_type_check_expr(expr->operand);
 			assert_exit(!t->is_rvalue, "address of operator expects an l-value.");
-			return sh_new_semantic_type(sh_new_typespec(SH_TYPE_PTR, t->base_type));
+			sh_typespec* ptr = sh_new_typespec(SH_TYPE_PTR, t->base_type);
+			ptr->size_byte = 8;
+			return sh_new_semantic_type_typespec(ptr);
 		} break;
 
 		default: {
@@ -526,9 +600,7 @@ sh_semantic_type* sh_type_check_stmt(sh_statement *stmt, sh_semantic_type *check
 		} break;
 
 		case SH_COMPOUND_STATEMENT: {
-			
 			return sh_type_check_compound_stmt(stmt, check_type_against);
-			return NULL;
 		} break;
 
 		case SH_VAR_DECL_STATEMENT: {
@@ -555,13 +627,18 @@ sh_semantic_type* sh_type_check_stmt(sh_statement *stmt, sh_semantic_type *check
 		case SH_FOR_STATEMENT: {
 			if(stmt->init_statement) { return sh_type_check_stmt(stmt->init_statement, check_type_against); }
 			if(stmt->condition_expr) { return sh_type_check_expr(stmt->condition_expr); }
-			if(stmt->post_loop_expr) { return sh_type_check_expr(stmt->post_loop_expr); }
+			if(stmt->post_loop_expr) { return sh_type_check_stmt(stmt->post_loop_expr, check_type_against); }
 			if(stmt->comp_statement) { return sh_type_check_stmt(stmt->comp_statement, check_type_against); } // probably should return a value 
 			return NULL;
 		} break;
 
-		case SH_BREAK_STATEMENT: break; //pass in parrent
+		case SH_BREAK_STATEMENT: break; //pass in parent
 		case SH_CONTINUE_STATEMENT: break;
+
+		default: {
+			assert_exit(false, "unhandled stmt type for type checking");
+		} break;
+
 	}
 
 	return NULL;
@@ -569,23 +646,40 @@ sh_semantic_type* sh_type_check_stmt(sh_statement *stmt, sh_semantic_type *check
 
 sh_semantic_type* sh_type_check_var_decl(sh_decl *decl) {
 
+	// original type
 	sh_semantic_type *var_type = sh_new_semantic_type_typespec(decl->var.type);
 
 	if(!decl->type_checked && decl->var.init_expr) {
 		sh_semantic_type *t = sh_type_check_expr_with_type(decl->var.init_expr, var_type);
 
-		if(!sh_semantic_type_equal(var_type, t)) {
-			char *expected_type = sh_print_typespec(var_type->base_type);
-			char *got_type = sh_print_typespec(t->base_type);
-			printf("type mismatched expected %s got %s", expected_type, got_type);
-			exit(0);
+
+		assert_exit(
+				sh_semantic_type_equal(var_type, t),
+				"type mismatched expected %s got %s",
+				sh_print_typespec(var_type->base_type),
+				sh_print_typespec(t->base_type)
+				);
+
+		//@Todo: typecheck array size expr, must be constant and check against elements
+		if(is_typespec_array(var_type->base_type) && var_type->base_type->array_size_expr == NULL) {
+			i32 array_size = t->array_size;
+			t->base_type->array_size_expr = sh_new_int_literal_expr(array_size);
+			decl->var.type = t->base_type;
+			var_type = t;
 		}
 
 
-		decl->type_checked = 1;
 	}
 
-	decl->total_size = var_type->size_byte;
+
+	//@Todo: this is probably wrong, needs more testing
+	if(is_typespec_array(decl->var.type)) {
+		assert_exit(decl->var.type->array_size_expr != NULL, "Array size has not been provided");
+	}
+
+
+	decl->type_checked = 1;
+	decl->total_size = decl->var.type->size_byte;
 
 	return var_type;
 }
@@ -596,26 +690,50 @@ sh_semantic_type* sh_type_check_func_decl(sh_decl *decl) {
 
 	if(decl->type_checked) return ret_type;
 
-	sh_statement **comp_stmt = decl->func.compound_statement->statements;
-	i32 has_return_stmt = 0;
 
-	for(sh_statement **stmt = comp_stmt; stmt != buf_end(comp_stmt); stmt++) {
-		sh_statement *st = stmt[0];
+	if(decl->func.compound_statement) {
 
-		if(st->type == SH_RETURN_STATEMENT) has_return_stmt = 1;
+		sh_statement **comp_stmt = decl->func.compound_statement->statements;
+		i32 has_return_stmt = 0;
 
-		sh_type_check_stmt(st, ret_type);
+		i32 func_size = 0;
+		for(sh_statement **stmt = comp_stmt; stmt != buf_end(comp_stmt); stmt++) {
+			sh_statement *st = stmt[0];
+
+			//@Todo: this is wrong and needs better handling as in deep handling of return statements? 
+			if(st->type == SH_RETURN_STATEMENT) has_return_stmt = 1;
+
+			sh_semantic_type *t = sh_type_check_stmt(st, ret_type); // this should return size
+			if(st->type == SH_VAR_DECL_STATEMENT) {
+				if(st->stmt_size == 0 && t->size_byte != 0) {
+					st->stmt_size = t->size_byte;
+				}
+
+				func_size += t->size_byte;
+			}
+
+		}
+
+		if(decl->total_size < func_size) {
+			// infered function size
+			decl->total_size = func_size;
+		}
+
+
+		if(!has_return_stmt) { 
+			if(ret_type->base_type->base_type != &sh_type_void) {
+				printf("error: \"%s\" ", decl->name);
+				char *must_return = sh_print_typespec(ret_type->base_type);
+				printf("no return statement found, function must return type %s\n", must_return);
+				free(must_return);
+			}
+		} 
+
+	} else if(is_dll_import(decl)) {
+		// should we import here? 
 	}
 
-	if(!has_return_stmt) { 
-		if(ret_type->base_type->base_type != &sh_type_void) {
-			printf("error: \"%s\" ", decl->name);
-			char *must_return = sh_print_typespec(ret_type->base_type);
-			printf("no return statement found, function must return type %s\n", must_return);
-			free(must_return);
-		}
-	} 
-
+	
 	decl->type_checked = 1;
 	return ret_type;
 }
