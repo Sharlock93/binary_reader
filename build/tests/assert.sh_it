@@ -1,0 +1,23 @@
+i32 val1 @assert(2);
+i32 val2 @assert( >1 && <5 || 2); // > < == <= >= && ||  & | id
+
+
+struct x { i8 val1; i8 val2; i8 val3; }
+
+struct test {
+	f32 val1 	@assert( 1.5 );
+	string val2 @assert( "hello world" );
+	f32 val3 	@assert( .val1/2 );
+	i8[4] val4  @assert( [1, >.val1/2, 3, 4] );
+	x val5 		@assert( { >1, >.val1, 3 } );
+	x val6 		@assert( { val1 = >5, val3 = <10 } );
+}
+
+
+test t = ?;
+
+t.val1;
+
+skip_byte(sizeof_byte(t) - sizeof_byte(x));
+
+t.val6;

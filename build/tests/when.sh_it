@@ -1,0 +1,13 @@
+struct when_test {
+	i8 type;
+	when .type {
+		0 -> i8[4],
+		1 -> i32,
+		2 -> tib[4]
+	} data @print(b) @array_print(2, 0, 2, 0);
+}
+
+
+when_test test1;
+when_test test2;
+when_test test3;

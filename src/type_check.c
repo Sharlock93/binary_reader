@@ -37,24 +37,42 @@ i8 is_int(sh_type *t) {
 	return is_eq;
 }
 
-i8 is_float(sh_type *t) {
-	return t == &sh_type_f32 || t == &sh_type_f64;
+i8 is_int_be(sh_type *t) {
+	i8 is_eq = 0;
+	// be types start at 8
+	for(sh_type** i = type_table + 8; i[0] != &sh_type_u64be; i++ ) {
+		if(t == i[0]) {
+			is_eq = 1;
+			break;
+		}
+	}
+
+	return is_eq;
 }
 
-i8 is_ptr(sh_semantic_type *t) { return t->is_ptr; }
-i8 is_defined_type(sh_semantic_type *t) { return t->base_type->type == SH_TYPE_DEFINED_TYPE; }
-i8 is_int_type(sh_semantic_type *t) { return is_defined_type(t) && is_int(t->base_type->base_type); }
-i8 is_float_type(sh_semantic_type *t) { return is_defined_type(t) && is_float(t->base_type->base_type); }
-
-i8 is_numeric_type(sh_semantic_type *t){ return is_int_type(t) || is_float_type(t); }
-
-i8 is_typespec_ptr(sh_typespec *t) { return t->type == SH_TYPE_PTR; }
-i8 is_typespec_defined_type(sh_typespec *t) { return t->type == SH_TYPE_DEFINED_TYPE; }
-i8 is_typespec_int_type(sh_typespec *t) { return is_typespec_defined_type(t) && is_int(t->base_type); }
-i8 is_typespec_float_type(sh_typespec *t) { return is_typespec_defined_type(t) && is_float(t->base_type); }
-i8 is_typespec_struct(sh_typespec *type){ return type->type == SH_TYPE_DEFINED_TYPE && type->base_type->is_struct == 1; }
-i8 is_typespec_array(sh_typespec *type) { return type->type == SH_TYPE_ARRAY; }
-i8 is_typespec_nil(sh_typespec *t) { return is_typespec_defined_type(t) && t->base_type == &sh_type_nil; }
+i8 is_float(sh_type *t)                        { return t != NULL && (t == &sh_type_f32 || t == &sh_type_f64); }
+i8 is_str(sh_type *t)                          { return t != NULL && t == &sh_type_string; }
+i8 is_ptr(sh_semantic_type *t)                 { return t != NULL && t->is_ptr; }
+i8 is_defined_type(sh_semantic_type *t)        { return t != NULL && t->base_type->type == SH_TYPE_DEFINED_TYPE; }
+i8 is_int_type(sh_semantic_type *t)            { return t != NULL && is_defined_type(t) && is_int(t->base_type->base_type); }
+i8 is_float_type(sh_semantic_type *t)          { return t != NULL && is_defined_type(t) && is_float(t->base_type->base_type); }
+i8 is_numeric_type(sh_semantic_type *t)        { return t != NULL && (is_int_type(t) || is_float_type(t)); }
+i8 is_typespec_ptr(sh_typespec *t)             { return t != NULL && t->type == SH_TYPE_PTR; }
+i8 is_typespec_defined_type(sh_typespec *t)    { return t != NULL && t->type == SH_TYPE_DEFINED_TYPE; }
+i8 is_typespec_int_type(sh_typespec *t)        { return t != NULL && is_typespec_defined_type(t) && is_int(t->base_type); }
+// i8 is_int_be(sh_typespec *t)        		   { return t != NULL && is_typespec_defined_type(t) && is_int_be(t->base_type); }
+i8 is_typespec_float_type(sh_typespec *t)      { return t != NULL && is_typespec_defined_type(t) && is_float(t->base_type); }
+i8 is_typespec_str(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && is_str(t->base_type); }
+i8 is_typespec_bit(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && t->base_type == &sh_type_bit; }
+i8 is_typespec_tib(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && t->base_type == &sh_type_tib; }
+i8 is_typespec_bit_or_tib(sh_typespec *t)      { return t != NULL && (is_typespec_bit(t) || is_typespec_tib(t)); }
+i8 is_typespec_struct(sh_typespec *t)          { return t != NULL && t->type == SH_TYPE_DEFINED_TYPE && t->base_type->is_struct == 1; }
+i8 is_typespec_enum(sh_typespec *t)       	   { return t != NULL && t->type == SH_TYPE_DEFINED_TYPE && t->base_type->is_enum == 1; }
+i8 is_typespec_when(sh_typespec *t)       	   { return t != NULL && t->type == SH_TYPE_WHEN; }
+i8 is_typespec_array(sh_typespec *t)           { return t != NULL && t->type == SH_TYPE_ARRAY; }
+i8 is_typespec_char(sh_typespec *t)            { return t != NULL && is_typespec_defined_type(t) && t->base_type == &sh_type_char; }
+i8 is_typespec_nil(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && t->base_type == &sh_type_nil; }
+i8 is_typespec_str_or_char_arr(sh_typespec *t) { return t != NULL && (is_typespec_str(t) || is_typespec_array(t) && is_typespec_char(t->base)); }
 
 i8 is_dll_import(sh_decl *decl) {
 	if(decl->tags) {
@@ -305,10 +323,21 @@ sh_semantic_type* sh_type_check_struct_literal_expr(sh_expression *expr, sh_sema
 sh_semantic_type* sh_type_check_id_expr(sh_expression *expr, sh_semantic_type *type) {
 	// highly questionable, 
 	sh_decl *decl = sh_get_decl(expr->name, expr->name_len); 
+
+	if(decl == NULL) {
+		sh_type *base_type = sh_get_type_name(expr->name, expr->name_len);
+
+		if(base_type != NULL) {
+			sh_semantic_type *t = sh_new_semantic_type( sh_new_base_typespec(SH_TYPE_DEFINED_TYPE, base_type));
+			return t;
+		}
+	}
+
 	if(decl == NULL) {
 		printf("unknown identifier %s\n", expr->name);
 		exit(1);
 	}
+
 	sh_semantic_type *t = sh_type_check_decl(decl);
 	t->is_rvalue = 0;
 	return t;
@@ -353,14 +382,14 @@ sh_semantic_type* sh_type_check_operator_expr(sh_expression *expr, sh_semantic_t
 
 sh_semantic_type* sh_type_check_array_expr(sh_expression* expr, sh_semantic_type* type_check) {
 	sh_semantic_type *expr_type = sh_type_check_expr(expr->array_expr);
+
 	assert_exit(expr->array_index_expr != NULL, "array index cannot be empty");
 
 	sh_semantic_type *array_index = sh_type_check_expr(expr->array_index_expr);
 
-	if(expr_type->base_type->type != SH_TYPE_ARRAY) {
-		printf("Cannot index a non-array type, tried to index type: %s",
+	if(expr_type->base_type->type != SH_TYPE_ARRAY && expr_type->base_type->type != SH_TYPE_DEFINED_TYPE) {
+		assert_exit(false, "Cannot index a non-array type, tried to index type: %s",
 				sh_print_typespec(expr_type->base_type));
-		exit(1);
 	}
 
 	if(!sh_semantic_type_equal(array_index, sh_new_int_literal(0))) {
@@ -371,7 +400,14 @@ sh_semantic_type* sh_type_check_array_expr(sh_expression* expr, sh_semantic_type
 				arr_expr, index_exp);
 		exit(1);
 	}
+
+
+	if(expr_type->base_type->type == SH_TYPE_DEFINED_TYPE) {
+		expr_type->base_type = sh_new_typespec(SH_TYPE_ARRAY, expr_type->base_type);
+	}
+
 	sh_semantic_type *t = sh_new_semantic_type_typespec(expr_type->base_type->base);
+	t->base_type->array_size_expr = expr->array_index_expr;
 	t->is_rvalue = 0;
 	return t;
 
@@ -468,7 +504,7 @@ sh_semantic_type* sh_type_check_expr_with_type(sh_expression* expr, sh_semantic_
 
 		case SH_ARRAY_EXPR: {
 			return sh_type_check_array_expr(expr, type_check);
-			} break;
+		} break;
 
 		case SH_FIELD_ACCESS_EXPR: {
 			return sh_type_check_field_access_expr(expr, type_check);
@@ -485,6 +521,11 @@ sh_semantic_type* sh_type_check_expr_with_type(sh_expression* expr, sh_semantic_
 			sh_typespec* ptr = sh_new_typespec(SH_TYPE_PTR, t->base_type);
 			ptr->size_byte = 8;
 			return sh_new_semantic_type_typespec(ptr);
+		} break;
+
+		case SH_QUESTION_OPERATOR_EXPR: {
+			// does nothing but delay reading of variable.
+			return type_check;
 		} break;
 
 		default: {

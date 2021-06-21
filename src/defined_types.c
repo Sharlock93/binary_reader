@@ -9,6 +9,8 @@ typedef enum sh_type_kind {
 	SH_TYPE_VAR,
 	SH_TYPE_ARRAY,
 	SH_TYPE_STRUCT,
+	SH_TYPE_ENUM,
+	SH_TYPE_WHEN,
 } sh_type_kind;
 
 typedef struct sh_struct_type {
@@ -19,139 +21,178 @@ typedef struct sh_alias_type {
 	sh_typespec *aliased_type;
 } sh_alias_type;
 
+typedef struct sh_enum_type {
+	sh_typespec *base_type;
+	sh_decl **fields;
+} sh_enum_type;
+
+
 typedef struct sh_type {
 	i32 name_len;
 	i32 size_byte;
+	i32 size_bit;
 
 	i32 is_alias;
 	i32 is_struct;
 	i32 is_ptr;
+	i32 is_enum;
 
-	char *name;
+	const char *name;
 
 	union {
 		sh_struct_type struct_type;
 		sh_alias_type alias;
+		sh_enum_type enum_type;
 	};
 
 } sh_type;
 
 
 typedef struct sh_keyword {
-	i32 name_len;
 	char* name;	
+	i32 name_len;
 } sh_keyword;
 
 sh_type **type_table = NULL;
 sh_keyword *keyword_table = NULL;
 
 
-sh_type sh_type_i8 = { .size_byte = 1, .name_len = 2, .name = "i8"};
-sh_type sh_type_u8 = { .size_byte = 1, .name_len = 2, .name = "u8"};
+#define DEFINE_TYPE(n, size_bit) sh_type sh_type_##n = { sizeof(#n)-1, size_bit/8, size_bit, .name = #n }
+DEFINE_TYPE(i8,     8);
+DEFINE_TYPE(u8,     8);
+DEFINE_TYPE(i16,    16);
+DEFINE_TYPE(u16,    16);
+DEFINE_TYPE(i32,    32);
+DEFINE_TYPE(u32,    32);
+DEFINE_TYPE(i64,    64);
+DEFINE_TYPE(u64,    64);
 
-sh_type sh_type_i16 = { .size_byte = 2, .name_len = 3, .name = "i16"};
-sh_type sh_type_u16 = { .size_byte = 2, .name_len = 3, .name = "u16"};
+DEFINE_TYPE(i8be,   8);
+DEFINE_TYPE(u8be,   8);
+DEFINE_TYPE(i16be,  16);
+DEFINE_TYPE(u16be,  16);
+DEFINE_TYPE(i32be,  32);
+DEFINE_TYPE(u32be,  32);
+DEFINE_TYPE(i64be,  64);
+DEFINE_TYPE(u64be,  64);
 
-sh_type sh_type_i32 = { .size_byte = 4, .name_len = 3, .name = "i32"};
-sh_type sh_type_u32 = { .size_byte = 4, .name_len = 3, .name = "u32"};
+DEFINE_TYPE(char,   8);
+DEFINE_TYPE(string, 0);
+DEFINE_TYPE(void,   0);
 
-sh_type sh_type_i64 = { .size_byte = 8, .name_len = 3, .name = "i64"};
-sh_type sh_type_u64 = { .size_byte = 8, .name_len = 3, .name = "u64"};
+DEFINE_TYPE(f32,    32);
+DEFINE_TYPE(f64,    64);
+DEFINE_TYPE(nil,    0);
+DEFINE_TYPE(bit,    1);
+DEFINE_TYPE(tib,    1);
+#undef DEFINE_TYPE
 
-sh_type sh_type_i8be = { .size_byte = 1, .name_len = 5, .name = "i8be"};
-sh_type sh_type_u8be = { .size_byte = 1, .name_len = 5, .name = "u8be"};
 
-sh_type sh_type_i16be = { .size_byte = 2, .name_len = 5, .name = "i16be"};
-sh_type sh_type_u16be = { .size_byte = 2, .name_len = 5, .name = "u16be"};
-
-sh_type sh_type_i32be = { .size_byte = 4, .name_len = 5, .name = "i32be"};
-sh_type sh_type_u32be = { .size_byte = 4, .name_len = 5, .name = "u32be"};
-
-sh_type sh_type_i64be = { .size_byte = 8, .name_len = 5, .name = "i64be"};
-sh_type sh_type_u64be = { .size_byte = 8, .name_len = 5, .name = "u64be"};
-
-sh_type sh_type_char = { .size_byte = 1, .name_len = 4, .name = "char"};
-sh_type sh_type_string = { .size_byte = 0, .name_len = 6, .name = "string"};
-
-sh_type sh_type_void = { .size_byte = 0, .name_len = 4, .name = "void"};
-
-sh_type sh_type_f32 = { .size_byte = 4, .name_len = 3, .name = "f32"};
-sh_type sh_type_f64 = { .size_byte = 8, .name_len = 3, .name = "f64"};
-
-sh_type sh_type_nil = { .size_byte = 8, .name_len = 3, .name = "nil"};
-
+#define DEFINE_TYPE(n, x) buf_push(type_table, &sh_type_##n); __COUNTER__
 void setup_internal_types() {
+	DEFINE_TYPE(i8,     8);
+	DEFINE_TYPE(u8,     8);
+	DEFINE_TYPE(i16,    16);
+	DEFINE_TYPE(u16,    16);
+	DEFINE_TYPE(i32,    32);
+	DEFINE_TYPE(u32,    32);
+	DEFINE_TYPE(i64,    64);
+	DEFINE_TYPE(u64,    64);
 
+	DEFINE_TYPE(i8be,   8);
+	DEFINE_TYPE(u8be,   8);
+	DEFINE_TYPE(i16be,  16);
+	DEFINE_TYPE(u16be,  16);
+	DEFINE_TYPE(i32be,  32);
+	DEFINE_TYPE(u32be,  32);
+	DEFINE_TYPE(i64be,  64);
+	DEFINE_TYPE(u64be,  64);
 
+	DEFINE_TYPE(char,   8);
+	DEFINE_TYPE(string, 0);
+	DEFINE_TYPE(void,   0);
 
-	buf_push(type_table, &sh_type_i8);
-	buf_push(type_table, &sh_type_u8);
-	buf_push(type_table, &sh_type_i16);
-	buf_push(type_table, &sh_type_u16);
-	buf_push(type_table, &sh_type_i32);
-	buf_push(type_table, &sh_type_u32);
-	buf_push(type_table, &sh_type_i64);
-	buf_push(type_table, &sh_type_u64);
+	DEFINE_TYPE(f32,    32);
+	DEFINE_TYPE(f64,    64);
+	DEFINE_TYPE(nil,    0);
+	DEFINE_TYPE(bit,    1);
+	DEFINE_TYPE(tib,    1);
 
-	buf_push(type_table, &sh_type_i8be);
-	buf_push(type_table, &sh_type_u8be);
-	buf_push(type_table, &sh_type_i16be);
-	buf_push(type_table, &sh_type_u16be);
-	buf_push(type_table, &sh_type_i32be);
-	buf_push(type_table, &sh_type_u32be);
-	buf_push(type_table, &sh_type_i64be);
-	buf_push(type_table, &sh_type_u64be);
-
-	buf_push(type_table, &sh_type_string);
-	buf_push(type_table, &sh_type_char);
-	buf_push(type_table, &sh_type_void);
-
-
-	buf_push(type_table, &sh_type_f32);
-	buf_push(type_table, &sh_type_f64);
-
-	buf_push(type_table, &sh_type_nil);
 }
+#undef DEFINE_TYPE
+
+#define KEYWORD_DEFINE(key) sh_keyword key##_keyword = { #key, sizeof(#key) - 1 }
+	KEYWORD_DEFINE(typedef);
+	KEYWORD_DEFINE(struct);
+	KEYWORD_DEFINE(enum);
+	KEYWORD_DEFINE(union);
+	KEYWORD_DEFINE(pack);
+	KEYWORD_DEFINE(for);
+	KEYWORD_DEFINE(while);
+	KEYWORD_DEFINE(if);
+	KEYWORD_DEFINE(elif);
+	KEYWORD_DEFINE(else);
+	KEYWORD_DEFINE(break);
+	KEYWORD_DEFINE(return);
+	KEYWORD_DEFINE(continue);
+	KEYWORD_DEFINE(nil);
+	KEYWORD_DEFINE(dll_import);
+	KEYWORD_DEFINE(var_import);
+	KEYWORD_DEFINE(skip_bit);
+	KEYWORD_DEFINE(skip_byte);
+	KEYWORD_DEFINE(rewind);
+	KEYWORD_DEFINE(peek);
+	KEYWORD_DEFINE(sizeof_byte);
+	KEYWORD_DEFINE(sizeof_bit);
+	KEYWORD_DEFINE(assert);
+	KEYWORD_DEFINE(cond);
+	KEYWORD_DEFINE(add_on);
+	KEYWORD_DEFINE(offset);
+
+	KEYWORD_DEFINE(print);
+	KEYWORD_DEFINE(array_print);
+	KEYWORD_DEFINE(struct_print);
+	KEYWORD_DEFINE(when);
+#undef KEYWORD_DEFINE
 
 
-sh_keyword typedef_keyword = { .name = "typedef", .name_len = 7 };
-sh_keyword struct_keyword = { .name = "struct", .name_len = 6 };
-sh_keyword for_keyword = { .name = "for", .name_len = 3 };
-sh_keyword while_keyword = { .name = "while", .name_len = 5 };
-sh_keyword if_keyword = { .name = "if", .name_len = 2 };
-sh_keyword elif_keyword = { .name = "elif", .name_len = 4 };
-sh_keyword else_keyword = { .name = "else", .name_len = 4 };
-sh_keyword break_keyword = { .name = "break", .name_len = 5 };
-sh_keyword return_keyword = { .name = "return", .name_len = 6 };
-sh_keyword continue_keyword = { .name = "continue", .name_len = 8 };
-sh_keyword nil_keyword = { .name = "nil", .name_len = 3 };
-
-sh_keyword dll_import = { .name = "dll_import", .name_len = 10 };
-sh_keyword var_import = { .name = "var_import", .name_len = 10 };
-
-/*
-sh_keyword dll_import = { .name = "stdout", .name_len = 6 };
-sh_keyword dll_import = { .name = "stdin", .name_len = 5 };
-*/
 
 void setup_keywords() {
 
-	buf_push(keyword_table, typedef_keyword);
-	buf_push(keyword_table, struct_keyword);
-	buf_push(keyword_table, for_keyword);
-	buf_push(keyword_table, while_keyword);
-	buf_push(keyword_table, if_keyword);
-	buf_push(keyword_table, else_keyword);
-	buf_push(keyword_table, elif_keyword);
+#define KEYWORD_DEFINE(key) buf_push(keyword_table, key##_keyword)
+	KEYWORD_DEFINE(typedef);
+	KEYWORD_DEFINE(struct);
+	KEYWORD_DEFINE(enum);
+	KEYWORD_DEFINE(union);
+	KEYWORD_DEFINE(pack);
+	KEYWORD_DEFINE(for);
+	KEYWORD_DEFINE(while);
+	KEYWORD_DEFINE(if);
+	KEYWORD_DEFINE(elif);
+	KEYWORD_DEFINE(else);
+	KEYWORD_DEFINE(break);
+	KEYWORD_DEFINE(return);
+	KEYWORD_DEFINE(continue);
+	KEYWORD_DEFINE(nil);
+	KEYWORD_DEFINE(dll_import);
+	KEYWORD_DEFINE(var_import);
+	KEYWORD_DEFINE(skip_bit);
+	KEYWORD_DEFINE(skip_byte);
+	KEYWORD_DEFINE(rewind);
+	KEYWORD_DEFINE(peek);
+	KEYWORD_DEFINE(sizeof_byte);
+	KEYWORD_DEFINE(sizeof_bit);
+	KEYWORD_DEFINE(assert);
+	KEYWORD_DEFINE(cond);
+	KEYWORD_DEFINE(add_on);
+	KEYWORD_DEFINE(offset);
 
-	buf_push(keyword_table, continue_keyword);
-	buf_push(keyword_table, break_keyword);
-	buf_push(keyword_table, return_keyword);
-	buf_push(keyword_table, nil_keyword);
-
-	buf_push(keyword_table, dll_import);
+	KEYWORD_DEFINE(print);
+	KEYWORD_DEFINE(array_print);
+	KEYWORD_DEFINE(struct_print);
+	KEYWORD_DEFINE(when);
+#undef KEYWORD_DEFINE
 }
-
 
 sh_type* sh_get_type(sh_token *token) {
 	for(sh_type **types = type_table;  types != buf_end(type_table); types++ ) {
@@ -170,6 +211,7 @@ sh_type* sh_get_type_name(const char *name, i32 name_len) {
 			return i;
 		}
 	}
+
 	return NULL;
 
 }

@@ -10,7 +10,6 @@ typedef struct sh_token {
 } sh_token;
 
 
-
 sh_token main_token = {0};
 sh_token *current_token = NULL;
 char *main_source = NULL;
@@ -43,7 +42,7 @@ void sh_tokenize() {
 			main_token.name = (char *) calloc(str_len + 1, sizeof(char));
 			memcpy(main_token.name, str_start, str_len);
 			main_token.name[str_len] = 0;
-			main_token.name_len = str_len + 1;
+			main_token.name_len = str_len;
 			main_source++;
 		} break;
 
@@ -81,6 +80,24 @@ void sh_tokenize() {
 
 			main_token.type.size_byte = 0;
 			main_token.name = base_type_names[main_token.type.base];
+
+		} break;
+
+		case '!': {
+
+			if(main_source[1] == '=') {
+				main_token.type.base = SH_NEQ;
+				main_token.name_len = 2;
+				main_source += 2;
+			} else {
+				main_token.type.base = main_source[0];
+				main_token.name_len = 1;
+				main_source++;
+			}
+
+			main_token.type.size_byte = 0;
+			main_token.name = base_type_names[main_token.type.base];
+
 
 		} break;
 
@@ -201,6 +218,15 @@ void sh_tokenize() {
 			main_source++;
 		} break;
 
+		case '^': {
+			main_token.type.base = SH_BXOR;
+			main_token.name_len = 1;
+			main_token.type.size_byte = 0;
+			main_token.name = base_type_names[main_token.type.base];
+			main_source++;
+		} break;
+
+
 
 		case '@':
 		case ',':
@@ -298,9 +324,16 @@ i32 is_token(sh_token_base_type type) {
 
 sh_token* sh_next_token() {
 
-	while(is_token(SH_COMMENT)) current_token++;
-	current_token++;
-	while(is_token(SH_COMMENT)) current_token++;
+	// Todo: Fix this comment skip
+
+	if(is_token(SH_COMMENT)) {
+		while(is_token(SH_COMMENT)) current_token++;
+	} else {
+		current_token++;
+	}
+
+	while(is_token(SH_COMMENT))
+		current_token++;
 
 	return current_token;
 }
@@ -327,4 +360,6 @@ void sh_print_token(sh_token *tok) {
 	);
 }
 
-
+i8 is_str_id_eq(char *str, i32 str_len) {
+	return str_len == current_token->name_len && strncmp(str, current_token->name, str_len) == 0;
+}

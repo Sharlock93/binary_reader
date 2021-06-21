@@ -1,6 +1,4 @@
 typedef enum sh_token_base_type {
-
-
 	SH_FREE_START, // indicate its freeable 
 
 	SH_INT,
@@ -57,7 +55,6 @@ typedef enum sh_token_base_type {
 	SH_AT = '@'
 
 } sh_token_base_type;
-
 
 char *base_type_names[] = {
 	[SH_INT] = "int",

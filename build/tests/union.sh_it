@@ -1,0 +1,11 @@
+struct when_test {
+
+	i8 discriminate;
+
+	when .discriminate { //ambiguous size
+		0 -> i8[4];
+		1 ->   i32;
+		2 ->   i64;
+	} test_data;
+}
+

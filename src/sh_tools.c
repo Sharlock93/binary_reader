@@ -136,7 +136,7 @@ void _assert_exit(i32 assert_condition, i32 line_number, const char *file, const
 	if(!assert_condition) {
 		va_list var_list;
 		va_start(var_list, fmt);
-		printf("%s(%d): ", file, line_number);
+		printf("\n%s(%d):(%s) ", file, line_number, func);
 		vprintf(fmt, var_list);
 		va_end(var_list);
 		exit(1);

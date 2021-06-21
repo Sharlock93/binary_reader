@@ -1,0 +1,50 @@
+enum u8 alphabet_zero_u8 {
+	A,
+	B,
+	C,
+	D,
+	E,
+	F
+}
+
+alphabet_zero_u8[6] test;
+
+enum tib[2] alphabet_zero_tib_array {
+	A,
+	B,
+	C,
+	D,
+	E,
+	F
+}
+
+alphabet_zero_tib_array[4] test2;
+
+enum u8 alphabet_ascii {
+	A = 65,
+	B,
+	C,
+	D,
+	E,
+	F
+}
+
+alphabet_ascii[6] test3;
+
+enum i8 random_numbers {
+	ZERO,
+	ONE = 1,
+	THREE = 3,
+	TWO = 2
+}
+
+random_numbers[6] test4;
+
+enum pack random_numbers_packed {
+	ONE = 1,
+	THREE = 5,
+	TWO = 2
+}
+
+random_numbers_packed[2] test5;
+

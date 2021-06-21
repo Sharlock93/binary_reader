@@ -1,0 +1,57 @@
+// BMP FILE TEST
+struct bmp_file_header {
+	char[2] id;
+	i32 size;
+	i32 reserved; // test/assert...
+	i32 offset;
+}
+
+enum i32 compression_type {
+	BI_RGB,
+	BI_RLE8,
+	BI_RLE4
+}
+
+enum i16 bit_per_pixel {
+	monochrome = 1, 
+	four_bit_palt = 4,
+	eight_bit_palt = 8,
+	rbg_16 = 16,
+	rgb_24 = 24
+}
+
+struct bmp_core_header {
+	i32 size;
+	i32 width;
+	i32 height;
+	i16 color_panels;
+	bit_per_pixel bits_per_pixel;
+	compression_type compression;
+	i32 image_size;
+
+	i32 h_res;
+	i32 v_res;
+
+	i32 num_colors;
+	i32 imp_colors;
+}
+
+struct bmp_info_header {
+	i16 res_unit;
+	i16 padding;
+}
+
+struct c_pallet {
+	u8 r;
+	u8 g;
+	u8 b;
+	u8 alpha;
+}
+
+struct bmp_file {
+	bmp_file_header hdr;
+	bmp_core_header core;
+	c_pallet[.core.num_colors] color_pallet @cond(.core.bits_per_pixel <= 8);
+}
+
+bmp_file h;

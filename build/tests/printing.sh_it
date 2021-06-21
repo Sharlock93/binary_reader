@@ -1,0 +1,35 @@
+struct printing_test {
+	i8 number1     @print(h);
+	i32 number2    @print(b);
+	tib[4] number3 @print(b);
+	tib[4] number4 @print(d);
+}
+
+printing_test test1;
+
+struct printing_test2 {
+	i8[5] numbers1 @array_print(2, -, -, 0, 0);
+	i8[5] numbers2 @array_print(-, -, -, 0, 0, -);
+	i8[5] numbers3;
+}
+
+printing_test2 test2 @struct_print(1, 1);
+
+// @struct_print(print_field_name = 1, seperate_lines = 1, seperator = ',')
+struct printing_test3 {
+	i8 n1;
+	i8 n2;
+	char n3;
+}
+
+printing_test3 test3;
+
+struct printing_test4 {
+	i8 n1;
+	i8 n2;
+	char n3;
+
+	printing_test3 n4 @struct_print(0, 0);
+}
+
+printing_test4 test4;

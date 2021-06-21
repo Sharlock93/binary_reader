@@ -1,0 +1,38 @@
+struct ihdr_type {
+	u32be Width;
+	u32be Height;
+	u8  bit_depth;
+	u8 color_type;
+	u8 compr_method;
+	u8 filter_method;
+	u8 interlace_method;
+}
+
+struct chunk {
+	u32be length;
+	char[4] type;
+
+	when(.type) {
+		"IHDR" -> ihdr_type,
+		"gAMA" -> u32be,
+		else -> u8[.length]
+	} data @array_print(-, -, 10, 0, 0) @add_on(.type);
+
+	u32 crc;
+}
+
+struct png_file {
+	i8[8] png_sig @array_print(-, -, -, 0, 0);
+	chunk[?] chunks;
+}
+
+png_file p = ?;
+
+p.png_sig;
+
+for(i32 i = 0; peek(chunk).type != "IEND"; i++) {
+	p.chunks[i];
+}
+p.chunks[i];
+
+

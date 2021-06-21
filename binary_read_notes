@@ -1,0 +1,135 @@
+appendable arrays:
+
+	- processing pngs
+		- 
+
+
+
+		struct chunk {
+			u32be length @add_to(.type);
+			char[4] type;
+
+			when(.type) {
+				"IHDR" -> ihdr_type,
+					"gAMA" -> u32be,
+					else -> u8[.length]
+			} data @array_print(10, -, -, 0, 0) @add_to(.type);
+
+			u32 crc;
+		}
+
+		struct png_file {
+			i8[8] png_sig @array_print(-, -, -, 0, 0);
+			chunk[?] chunks;
+		}
+
+
+	- this needs reading the entire struct/array before determining if it should be appendable
+
+
+New addtions: ?
+	- appendable arrays? 
+	- position of specific items in the stream? maybe?
+		- position_of(variable)
+			- seek_to(position_of(var)) 
+
+
+
+
+Todo: 
+	- print a value in hex or binary or oct - Done
+		- @print_option(hex)
+
+	- printing values - done
+		- limit array size, etc.
+		- no printing at all
+		- print number of items per row
+
+
+	- sizeof_byte, sizeof_bit (variable) ~ maybe? 
+		- needed for dynamically changing fields
+
+===========================================================
+- conditional reads - done
+	- depend on another field for reading
+		- if X == Y read otherwise skip
+
+
+- When types
+	- check item and read based on value
+
+=================================================================
+Optional reads
+
+if(peek(typename)) {
+
+}
+
+================================================================
+
+
+	>8 && <2 
+	(!>i+2) && (< i - 1) || |2 && &2 )
+
+	>1
+
+=============================================================
+New Additions: 
+
+- assert
+	- check if a value is a specific thing?
+
+	- global turn off assert?
+	- turn off assert for specific struct? 
+
+  syntax: 
+  	@assert( 0 )        == normal val check
+	@assert("BM")       == string checking
+	@assert([ 1, 2 ])   == array checking
+
+	i32 val @assert(some_val);
+
+	struct assert_test {
+		i32 val1  @assert(2);
+		i8  val2  @assert( 10 );
+	}
+
+	i32 val1 @assert( 0 ); val1 == 0 //implicit equal
+	i32 val1 @assert( ==0 ); val1 == 0 //explicit equal
+	i32 val1 @assert( >=0 ); val1 >= 0 //explicit equal
+	i32 val1 @assert( 0 && 1 ); val1 >= 0 // and
+
+
+	-Todo
+		- multiple checks
+		- bitfield check? maybe
+
+	- Done
+
+- peek - done
+	- output val without reading?  (read and rewind)
+	- could be used for ifs
+
+- conditional reads
+	- depend on another field for reading
+		- if X == Y read otherwise skip
+
+- array size dependency - done
+	- specify  array size in terms of data fields
+
+	- creates dependency -> 
+		- don't read "until" specific field has a value?
+		- out of order specification?
+
+
+- unions/conditional structs? - conditon
+	- ???
+
+- enums - done
+	- good for easier flag/bit checking
+
+- skip - maybe
+	- rename to "skip_bits" and also add "skip_bytes"
+
+---
+text editor 

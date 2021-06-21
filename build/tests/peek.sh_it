@@ -1,0 +1,49 @@
+struct hdr1 { char[2] hdr_tag; i8 v; }
+struct hdr2 { char[2] hdr_tag; i32 v; }
+
+hdr1 example1 = ?;
+hdr2 example2 = ?;
+
+// basic types - str
+if(peek(char[2]) == "HL") { example1; } else { example2; }
+
+struct hdr3 { i8 type; f32 val; }
+struct hdr4 { i8 type; i64 val; }
+
+// basic types - int
+hdr3 example3 = ?;
+hdr4 example4 = ?;
+
+if(peek(i8) == 42) {
+	example3;
+} else {
+	example4;
+}
+
+if(peek(i8) == 42) {
+	example3;
+} else {
+	example4;
+}
+
+
+struct hdr5 { i8 type; f32 val; }
+struct hdr6 { i8 type; i64 val; }
+
+
+hdr5 example5 = ?;
+hdr6 example6 = ?;
+
+if(peek(hdr5.type) == 32) {
+	example5;
+} else {
+	example6;
+}
+
+if(peek(hdr5).type != 32) {
+	example6;
+} else {
+	example5;
+}
+
+// not exhaustive

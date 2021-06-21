@@ -1,0 +1,3 @@
+
+Bugs: 
+- This causes an issue: test_binary_file("tests/bmp.sh_it", "tests/bmp3.bmp");

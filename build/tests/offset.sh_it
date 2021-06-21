@@ -1,0 +1,8 @@
+struct offset_test {
+	i8 offset;
+	i8[3] data @offset(file_start, .offset);
+}
+
+
+
+offset_test[2] t;

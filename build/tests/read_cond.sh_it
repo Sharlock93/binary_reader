@@ -1,0 +1,8 @@
+struct read_cond {
+	u8 number;
+	i32 x @cond(.number == 4);
+	i8 y @cond(.number == 2);
+}
+
+read_cond test1;
+read_cond test2;

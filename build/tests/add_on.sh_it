@@ -1,0 +1,10 @@
+struct x {
+	i8 number @add_on(.type);
+	i8 type;
+	i8[.number] data @add_on(.type);
+}
+
+// for arrays, if base type has add_on then array elem will also have add on
+x[?] y = ?;
+y[0];
+y[1];
