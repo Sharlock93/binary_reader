@@ -4,6 +4,7 @@ PFNWGLCHOOSEPIXELFORMATARBPROC wglChoosePixelFormatARB;
 PFNGLGENERATEMIPMAPPROC glGenerateMipmap;
 PFNGLACTIVETEXTUREPROC glActiveTexture;
 PFNGLUNIFORM4FVPROC glUniform4fv;
+PFNGLUNIFORM1IPROC glUniform1i;
 PFNGLUNIFORMMATRIX4FVPROC glUniformMatrix4fv;
 PFNGLUSEPROGRAMPROC glUseProgram;
 PFNGLGETPROGRAMINFOLOGPROC glGetProgramInfoLog;
@@ -32,6 +33,7 @@ void load_ext() {
 	glGenerateMipmap = (PFNGLGENERATEMIPMAPPROC) wglGetProcAddress("glGenerateMipmap");
 	glActiveTexture = (PFNGLACTIVETEXTUREPROC) wglGetProcAddress("glActiveTexture");
 	glUniform4fv = (PFNGLUNIFORM4FVPROC) wglGetProcAddress("glUniform4fv");
+	glUniform1i = (PFNGLUNIFORM1IPROC) wglGetProcAddress("glUniform1i");
 	glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC) wglGetProcAddress("glUniformMatrix4fv");
 	glUseProgram = (PFNGLUSEPROGRAMPROC) wglGetProcAddress("glUseProgram");
 	glGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC) wglGetProcAddress("glGetProgramInfoLog");

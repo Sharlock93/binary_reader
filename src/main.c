@@ -20,10 +20,26 @@
 #include "sh_simple_vec_math.c"
 #include "table_read_utils.c"
 #include <ft2build.h>
+
+
+#pragma comment(lib, "lib/glfw3dll.lib")
+
+#include <GLFW/glfw3.h>
+
 #include FT_FREETYPE_H
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+
+#define USE_FREE_TYPE 1
+// #define USE_GLFW 
+
+
+typedef struct character_info {
+	pos4 uv;
+	i32 x_offset;
+	i32 y_offset;
+} character_info;
 
 typedef struct sh_window_context {
 	i16 height;
@@ -41,8 +57,26 @@ typedef struct sh_window_context {
 	char input[256];
 	i32 input_size;
 	u8 *font_atlas;
+	u8 *ft_atlas;
 	i32 font_atlas_texture;
+	i32 ft_atlas_texture;
+	i32 atlas_height;
+	i32 atlas_width;
+	i32 ft_atlas_height;
+	i32 ft_atlas_width;
+
+	character_info char_cache[94];
+	character_info ft_char_cache[94];
+	char *text;
+	i32 line_numbers;
+	GLFWwindow *window;
+	i32 left_add;
+	i32 top_add;
 } sh_window_context;
+
+
+// u - v, float - 4 byte each - so 8 bytes
+// index <- 
 
 sh_window_context gl_ctx;
 font_directory *font;
@@ -247,7 +281,7 @@ void rasterize_glyph(line *edges, int num_edges, unsigned char *mem, int m_size,
 	// memset(mem, 0, m_size);
 	intersection *edge_intersection = NULL;
 
-	int div_scanline = 5;
+	int div_scanline = 15;
 	float alpha = 255.0f/div_scanline;
 	float step_per_line = 1.0f/div_scanline;
 	int from_edge = 0;
@@ -372,7 +406,7 @@ void render_letter(unsigned char *mem, int m_size, int m_w, int m_h, font_direct
 
 	sh_glyph_outline g = get_glyph_outline(font, letter);
 
-	int h = g.p2.y - g.p1.y;
+	// int h = g.p2.y - g.p1.y;
 	int as_ds = font->hhea.ascent - font->hhea.descent;
 	float ft_scale = (float) font_size_pixel/(as_ds);
 
@@ -381,7 +415,7 @@ void render_letter(unsigned char *mem, int m_size, int m_w, int m_h, font_direct
 	int num_edges = 0;
 	int pts_len = 0;
 
-	pos2 *pts = generate_points(&g, ft_scale, 3, &pts_len, &num_contours, &contour_ends_index); //the amount of tessilation affects the speed a ton
+	pos2 *pts = generate_points(&g, ft_scale, 5, &pts_len, &num_contours, &contour_ends_index); //the amount of tessilation affects the speed a ton
 	line *edges = generate_edges(pts, num_contours, contour_ends_index, &num_edges);
 	rasterize_glyph(edges, num_edges, mem, m_size, m_w, m_h);
 
@@ -392,32 +426,27 @@ void render_letter(unsigned char *mem, int m_size, int m_w, int m_h, font_direct
 
 }
 
-
-
-
-
-
-
 void setup(void) {
 
+	// abcdefg
 	gl_ctx = (sh_window_context){ 500, 500, 0, 0, 0, "editor" };
-	gl_ctx.font_size = 64;
+	gl_ctx.font_size = 24;
 	gl_ctx.quad_height = 64;
 	gl_ctx.quad_width = 64;
+	buf_fit(gl_ctx.text, 256);
+	memset(gl_ctx.text, 0, 256);
+	buf_push(gl_ctx.text, 'A');
 	sh_window_setup();
 	glClearColor(61.0f/255.0f, 41.0f/255.0f, 94.0f/255.0f, 1);
 
 	size_t mem_size = 0;
-	char* ttf_file = read_file("envy.ttf", &mem_size);
+	char* ttf_file = read_file("yes.ttf", &mem_size);
 	char* file_loc = ttf_file;
 	font = sh_init_font(ttf_file);
 
 
 }
 
-
-
-char *text = NULL;
 
 typedef struct split_lines {
 	char **lines;
@@ -475,9 +504,13 @@ typedef struct text_rect {
 	f32 y;
 	f32 width;
 	f32 height;
+	f32 u_s;
+	f32 v_s;
+	f32 u_e;
+	f32 v_e;
 } text_rect;
 
-render_context ren_ctx = {0, 500, 12, 5, 3};
+render_context ren_ctx = {0, 0, 64, 5, 3};
 cursor curs = {0, 0};
 text_rect *line_quads = NULL;
 
@@ -491,16 +524,22 @@ i32 vert_count = 0;
 void setup_line_quads(split_lines lines) {
 	i32 index_start = 0;
 
-	for(i32 i = 0; i < lines.line_nums; i++) {
+	for(i32 i = 0; i < buf_len(line_quads); i++) {
 
 		text_rect *r = line_quads + i;
 
-		buf_fit(quad_vertices, 4);
+		buf_fit(quad_vertices, 8);
 
 		buf_push(quad_vertices, (pos2){r->x, r->y - r->height});
 		buf_push(quad_vertices, (pos2){r->x, r->y});
 		buf_push(quad_vertices, (pos2){r->x + r->width, r->y});
 		buf_push(quad_vertices, (pos2){r->x + r->width, r->y - r->height});
+
+		buf_push(quad_vertices, (pos2){r->u_s, r->v_s});
+		buf_push(quad_vertices, (pos2){r->u_s, r->v_e});
+		buf_push(quad_vertices, (pos2){r->u_e, r->v_e});
+		buf_push(quad_vertices, (pos2){r->u_e, r->v_s});
+
 
 		buf_push(indices, index_start + 0);
 		buf_push(indices, index_start + 1);
@@ -510,8 +549,8 @@ void setup_line_quads(split_lines lines) {
 		buf_push(indices, index_start + 2);
 		buf_push(indices, index_start + 3);
 
-		vert_count += 4;
-		index_start += 4;
+		vert_count += 8;
+		index_start += 8;
 		index_count += 6;
 
 	}
@@ -532,56 +571,387 @@ void setup_quad_vbo(void) {
 	}
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_vbo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(i32)*(vert_count/4)*6, indices, GL_DYNAMIC_DRAW);
+	// printf("%d\n", (vert_count/8)*6 );
+	// fflush(stdout);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(i32)*(vert_count/8)*6, indices, GL_DYNAMIC_DRAW);
 }
 
+
+i8 once = 1;
 void render_text(char *text) {
 
 	if(text == NULL) return;
 
+
 	i32 y = (i32)strlen(text);
 	split_lines l = split_text(text, y);
+	if(l.line_nums == 0)
+		gl_ctx.line_numbers = 1;
+	else
+		gl_ctx.line_numbers = l.line_nums;
+
+	int as_ds = font->hhea.ascent - font->hhea.descent;
+	float ft_scale = (float) gl_ctx.font_size/(as_ds);
+
+#if USE_FREE_TYPE
+	f32 w = (f32)gl_ctx.ft_atlas_width;
+	f32 h = (f32)gl_ctx.ft_atlas_height;
+#else 
+	f32 w = (f32)gl_ctx.atlas_width;
+	f32 h = (f32)gl_ctx.atlas_height;
+#endif
+
+	f32 top = ren_ctx.next_y - ren_ctx.top_margin;
+
+#if USE_FREE_TYPE
+	f32 baseline_y = top - font->hhea.ascent*ft_scale - 10;
+#else
+	f32 baseline_y = top - font->hhea.ascent*ft_scale;
+#endif
 
 	for(i32 i = 0; i < l.line_nums; i++) {
-		buf_push(line_quads,
-				(text_rect){
-					(f32)ren_ctx.next_x + ren_ctx.left_margin,
-					(f32)ren_ctx.next_y - ren_ctx.top_margin,
-					(f32)(l.line_length[i]*gl_ctx.font_size),
-					(f32)gl_ctx.font_size
-				});
-		ren_ctx.next_y -= gl_ctx.font_size;
+
+
+		for(i32 j = 0; j < l.line_length[i]; j++) {
+
+#if USE_FREE_TYPE
+
+			character_info *c = gl_ctx.ft_char_cache + (l.lines[i][j] - ' ');
+#else
+			character_info *c = gl_ctx.char_cache + (l.lines[i][j] - ' ');
+#endif
+
+			pos4 char_uv = c->uv;
+			pos2 size = {char_uv.z, char_uv.w};
+			pos2 size_uv = {char_uv.z, char_uv.w};
+
+
+#if USE_FREE_TYPE
+			buf_push(line_quads,
+					(text_rect){
+					(f32)ren_ctx.next_x + ren_ctx.left_margin + gl_ctx.left_add,
+					(f32)baseline_y + size.y + c->y_offset + gl_ctx.top_add,
+					size.x,
+					size.y,
+					char_uv.x/w,
+					( char_uv.y + size_uv.y )/h,
+					( char_uv.x + size_uv.x )/w,
+					char_uv.y/h,
+					});
+
+			if(once) {
+				printf("(%f %f) (%f %f)/(%f %f) (%f %f)/(%f %f) (%f %f)\n",
+						size.x, size.y,
+						char_uv.x/w, char_uv.y/h,
+						char_uv.x, char_uv.y,
+						( char_uv.x + size_uv.x )/w, ( char_uv.y + size_uv.y )/h,
+						( char_uv.x + size_uv.x ), ( char_uv.y + size_uv.y ),
+						w, h
+					  );
+				once = 0;
+			}
+#else 
+			buf_push(line_quads,
+					(text_rect){
+					(f32)ren_ctx.next_x + ren_ctx.left_margin + gl_ctx.left_add,
+					(f32)baseline_y + size.y + c->y_offset + gl_ctx.top_add,
+					size.x,
+					size.y,
+					char_uv.x/w,
+					char_uv.y/h,
+					( char_uv.x + size_uv.x )/w,
+					( char_uv.y + size_uv.y )/h
+					});
+
+
+#endif
+
+			ren_ctx.next_x += size.x;
+		}
+
+
+
+		ren_ctx.next_x = 0;
+		baseline_y -= gl_ctx.font_size;
 	}
 
 	setup_line_quads(l);
 }
 
 
+void draw_rect(f32 x, f32 y, f32 width, f32 height) {
+
+	i32 backup_poly_mode = 0;
+	glGetIntegerv(GL_POLYGON_MODE, &backup_poly_mode);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	u32 buf = 0;
+
+	pos2 quad[6] = {
+		{x, y},
+		{x, y+height},
+		{x+width, y+height},
+
+		{x, y},
+		{x+width, y+height},
+		{x+width, y},
+
+	};
+
+	glGenBuffers(1, &buf);
+	glBindBuffer(GL_ARRAY_BUFFER, buf);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pos2)*6, quad, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	glDeleteBuffers(1, &buf);
+	glPolygonMode(GL_FRONT_AND_BACK, backup_poly_mode);
+}
 
 
+void draw_rect_outline(f32 x, f32 y, f32 width, f32 height) {
 
-void render(void) {
+	i32 backup_poly_mode = 0;
+	glGetIntegerv(GL_POLYGON_MODE, &backup_poly_mode);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	u32 buf = 0;
 
-	// render_text(text);
-	// setup_quad_vbo();
+	pos2 quad[4] = {
+		{x, y},
+		{x, y+height},
+		{x+width, y+height},
+		{x+width, y},
+
+	};
+
+	glGenBuffers(1, &buf);
+	glBindBuffer(GL_ARRAY_BUFFER, buf);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pos2)*4, quad, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+	glDeleteBuffers(1, &buf);
+	glPolygonMode(GL_FRONT_AND_BACK, backup_poly_mode);
+}
 
 
-	// glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
-	// glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+void draw_baseline(i32 lines) {
 
-	// glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_vbo);
+	u32 bufs[2] = {0};
+	glGenBuffers(1, bufs);
 
-	// glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT , 0);
+	pos4 *line = NULL;
+	buf_fit(line, lines);
 
-	// buf_clear(indices);
-	// buf_clear(quad_vertices);
-	// buf_clear(line_quads);
-	// vert_count = 0;
-	// ren_ctx = (render_context){0, 500, 12, 5, 3};
+	for(i32 i = 0; i < lines; i++) {
+		buf_push(line, (pos4){
+				ren_ctx.left_margin, gl_ctx.height - ren_ctx.top_margin - gl_ctx.font_size*i,
+				ren_ctx.left_margin + gl_ctx.width, gl_ctx.height - ren_ctx.top_margin - gl_ctx.font_size*i,
+				});
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, bufs[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pos4)*lines, line, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	pos4 red = {1, 0, 0, 1};
+	glUniform4fv(2, 1, &red.x);
+	glUniform1i(5, 0);
+
+	glDrawArrays(GL_LINES, 0, lines*2);
+	glDeleteBuffers(1, bufs);
+
+	int as_ds = font->hhea.ascent - font->hhea.descent;
+	float ft_scale = (float) gl_ctx.font_size/(as_ds);
+	i32 h = font->hhea.ascent - font->hhea.descent;
+	draw_rect_outline(ren_ctx.left_margin, gl_ctx.height - ren_ctx.top_margin, 20, -h*ft_scale);
+
+}
+
+void draw_text_atlas(i32 x, i32 y) {
+	u32 atlas_vbo = 0;
+	glGenBuffers(1, &atlas_vbo);
+	pos2 pos = {(f32)x, (f32)y};
+
+	pos2 quad[] = {
+		{pos.x, pos.y},
+		{pos.x, pos.y + (f32)gl_ctx.atlas_height},
+		{pos.x + (f32)gl_ctx.atlas_width, pos.y + (f32)gl_ctx.atlas_height},
+
+		{pos.x, pos.y},
+		{pos.x + (f32)gl_ctx.atlas_width, pos.y + (f32)gl_ctx.atlas_height},
+		{pos.x + (f32)gl_ctx.atlas_width, pos.y},
+
+		{0, 0},
+		{0, 1},
+		{1, 1},
+
+		{0, 0},
+		{1, 1},
+		{1, 0},
+	};
+	
+
+	glBindBuffer(GL_ARRAY_BUFFER, atlas_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pos2)*12, quad, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(sizeof(pos2)*6));
+	pos4 black = {1, 1, 1, 1};
+	glUniform4fv(2, 1, &black.x);
 
 	glBindTexture(GL_TEXTURE_2D, gl_ctx.font_atlas_texture);
 
-	// render_line_quads();
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &atlas_vbo);
+
+}
+
+void draw_ft_text_atlas(i32 x, i32 y) {
+	u32 atlas_vbo = 0;
+	glGenBuffers(1, &atlas_vbo);
+	pos2 pos = {(f32)x, (f32)y};
+
+	pos2 quad[] = {
+		{pos.x, pos.y},
+		{pos.x, pos.y + (f32)gl_ctx.ft_atlas_height},
+		{pos.x + (f32)gl_ctx.ft_atlas_width, pos.y + (f32)gl_ctx.ft_atlas_height},
+
+		{pos.x, pos.y},
+		{pos.x + (f32)gl_ctx.ft_atlas_width, pos.y + (f32)gl_ctx.ft_atlas_height},
+		{pos.x + (f32)gl_ctx.ft_atlas_width, pos.y},
+
+		{0, 0},
+		{0, 1},
+		{1, 1},
+
+		{0, 0},
+		{1, 1},
+		{1, 0},
+	};
+	
+
+	glBindBuffer(GL_ARRAY_BUFFER, atlas_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pos2)*12, quad, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(sizeof(pos2)*6));
+	pos4 black = {1, 1, 1, 1};
+	glUniform4fv(2, 1, &black.x);
+
+	glBindTexture(GL_TEXTURE_2D, gl_ctx.ft_atlas_texture);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &atlas_vbo);
+
+}
+
+void draw_letter(char c) {
+	pos2 position = {10, 10};
+	pos4 char_uv = gl_ctx.char_cache[(c - ' ')].uv;
+	pos2 size = {char_uv.z, char_uv.w};
+	pos2 size_uv = {char_uv.z, char_uv.w};
+
+	f32 w = (f32)gl_ctx.atlas_width;
+	f32 h = (f32)gl_ctx.atlas_height;
+
+	u32 letter_vbo = 0;;
+
+	pos2 letter_data[] = {
+		{position.x, position.y},
+		{position.x, position.y + size.y},
+		{position.x + size.x, position.y + size.y},
+
+		{position.x, position.y},
+		{position.x + size.x, position.y + size.y},
+		{position.x + size.x, position.y},
+
+
+		{char_uv.x/w, char_uv.y/h},
+		{( char_uv.x )/w, ( char_uv.y + size_uv.y )/h},
+		{( char_uv.x + size_uv.x )/w, ( char_uv.y + size_uv.y )/h},
+
+		{char_uv.x/w, char_uv.y/h},
+		{( char_uv.x + size_uv.x )/w, ( char_uv.y + size_uv.y )/h},
+		{( char_uv.x + size_uv.x )/w, ( char_uv.y )/h},
+	};
+
+
+	glGenBuffers(1, &letter_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, letter_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(pos2)*12, letter_data, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(sizeof(pos2)*6));
+	glUniform1i(5, 1);
+	pos4 black = {1, 1, 1, 1};
+	glUniform4fv(2, 1, &black.x);
+
+	glBindTexture(GL_TEXTURE_2D, gl_ctx.font_atlas_texture);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &letter_vbo);
+
+
+}
+
+char letter = 'A';
+
+void render(void) {
+
+
+	render_text(gl_ctx.text);
+	setup_quad_vbo();
+
+	// glUniform1i(5, 1);
+	// glUniform1i(6, 0);
+	// draw_text_atlas(0, 0);
+
+	// glUniform1i(5, 1);
+	// glUniform1i(6, 1);
+	// draw_ft_text_atlas(gl_ctx.atlas_width + 10, 0);
+
+	// glUniform1i(6, 1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void*)(sizeof(pos2)*4));
+	glUniform1i(5, 1);
+
+#if USE_FREE_TYPE
+	glBindTexture(GL_TEXTURE_2D, gl_ctx.ft_atlas_texture);
+	glUniform1i(6, 1);
+#else
+	glBindTexture(GL_TEXTURE_2D, gl_ctx.font_atlas_texture);
+	glUniform1i(6, 0);
+#endif
+
+	pos4 yellow = {1, 1, 1, 1};
+	glUniform4fv(2, 1, &yellow.x);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_vbo);
+	glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+	glDrawElements(GL_TRIANGLES, index_count, GL_UNSIGNED_INT , 0);
+
+	pos4 black = {1, 1, 1, 1};
+	glUniform4fv(2, 1, &black.x);
+	
+	buf_clear(indices);
+	buf_clear(quad_vertices);
+	buf_clear(line_quads);
+	vert_count = 0;
+	ren_ctx.next_y = 500;
+	ren_ctx.next_x = 0;
+	index_count = 0;
+
 }
 
 void reset_global_context() {
@@ -593,18 +963,23 @@ void delete_character(void) {
 	//handle cursor location
 	
 	//delete from the end
-	buf_pop(text);
+	buf_pop(gl_ctx.text);
 }
 
 
 void add_character(char c) {
-	buf_push(text, c);
+	buf_push(gl_ctx.text, c);
 }
 
 
+void mem_copy_square(u8 *dest, u8 *source, i32 w, i32 h, i32 stride, i32 dest_stride) {
+	for(i32 i = 0; i < h; i++) {
+		memcpy(dest + i*dest_stride, source + i*stride, stride);
+	}
+}
+
 
 void setup_font_atlas() {
-
 
 	int as_ds = font->hhea.ascent - font->hhea.descent;
 	float ft_scale = (float) gl_ctx.font_size/(as_ds);
@@ -621,11 +996,14 @@ void setup_font_atlas() {
 	i32 atlas_width  = ( max_char_width + pixel_gap )*char_per_row;
 
 	i32 rows = char_count/char_per_row;
-	printf("rows %d\n", rows);
 
 	i32 atlas_height = 	( max_char_height + pixel_gap )*rows;
 
 	gl_ctx.font_atlas = (u8*)calloc((atlas_height)*(atlas_width), sizeof(u8));
+
+	gl_ctx.atlas_height = atlas_height;
+	gl_ctx.atlas_width = atlas_width;
+
 	char *mem_loc = gl_ctx.font_atlas;
 
 	i32 x = 0;
@@ -634,9 +1012,7 @@ void setup_font_atlas() {
 	i32 max_row_height = 0;
 
 
-
 	for(i32 i = start_char; i < start_char + char_count; i++ ) {
-
 
 		// render_letter(int m_size, int m_w, int m_h, font_directory *font, char letter, int font_size_pixel) {
 		render_letter(
@@ -653,6 +1029,15 @@ void setup_font_atlas() {
 		i32 w = (i32)( ( g.p2.x - g.p1.x )*ft_scale );
 		i32 h = (i32)( ( g.p2.y - g.p1.y )*ft_scale );
 
+		
+		gl_ctx.char_cache[i - start_char].uv.x = (f32)x;
+		gl_ctx.char_cache[i - start_char].uv.y = (f32)y;
+		gl_ctx.char_cache[i - start_char].uv.z = (f32)( w+pixel_gap );
+		gl_ctx.char_cache[i - start_char].uv.w = (f32)( h+pixel_gap );
+
+		gl_ctx.char_cache[i - start_char].x_offset = (i32)( g.p1.x*ft_scale );
+		gl_ctx.char_cache[i - start_char].y_offset = (i32)( g.p1.y*ft_scale );
+
 		if(h > max_row_height) max_row_height = h;
 
 		x += (i32)(w) + pixel_gap;
@@ -662,6 +1047,7 @@ void setup_font_atlas() {
 			x = 0;
 		}
 
+		
 	}
 
 
@@ -669,11 +1055,15 @@ void setup_font_atlas() {
 	glGenTextures(1, &gl_ctx.font_atlas_texture);
 	glBindTexture(GL_TEXTURE_2D, gl_ctx.font_atlas_texture);
 
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
@@ -687,21 +1077,130 @@ void setup_font_atlas() {
 }
 
 
+void setup_font_atlas_freetype(void) {
+
+	FT_Library lib;
+	FT_Face face;
+
+	if(FT_Init_FreeType(&lib) != 0) {
+		puts("failed to init freetype");
+		exit(1);
+	}
+
+	if(FT_New_Face(lib, "./envy.ttf", 0, &face) != 0) {
+		puts("new face failed");
+	}
+
+
+	FT_Set_Pixel_Sizes(face, 0, gl_ctx.font_size);
+
+	i32 char_count = 94;
+	char start_char = ' ';
+
+
+
+
+	i32 max_char_width = face->size->metrics.x_ppem;
+	i32 max_char_height = face->size->metrics.y_ppem;
+
+	i32 pixel_gap = 2;
+	i32 char_per_row = ((i32)sqrt(char_count)) + 1;
+	i32 rows = char_count/char_per_row;
+
+	i32 atlas_width  = ( max_char_width + pixel_gap )*char_per_row;
+	i32 atlas_height = ( max_char_height + pixel_gap )*rows;
+	gl_ctx.ft_atlas_height = atlas_height;
+	gl_ctx.ft_atlas_width = atlas_width;
+
+	gl_ctx.ft_atlas = (u8*)calloc((atlas_height)*(atlas_width), sizeof(u8));
+
+
+
+	FT_GlyphSlot glyph_slot = face->glyph;
+
+	i32 x = 0;
+	i32 y = 0;
+
+	for(i32 i = start_char; i < start_char + char_count; i++) {
+		u32 glyph_index = FT_Get_Char_Index(face, i);
+		FT_Load_Glyph(face, glyph_index, FT_LOAD_DEFAULT);
+		FT_Render_Glyph(glyph_slot, FT_RENDER_MODE_NORMAL);
+
+		u8 *bitmap_buf = glyph_slot->bitmap.buffer;
+		i32 width = glyph_slot->bitmap.width;
+		i32 height = glyph_slot->bitmap.rows;
+		i32 pitch = glyph_slot->bitmap.pitch;
+
+		mem_copy_square(gl_ctx.ft_atlas + x + y*atlas_width, bitmap_buf, width, height, pitch, atlas_width);
+
+		
+		gl_ctx.ft_char_cache[i - start_char].uv.x = (f32)x;
+		gl_ctx.ft_char_cache[i - start_char].uv.y = (f32)y;
+		gl_ctx.ft_char_cache[i - start_char].uv.z = (f32)( width);
+		gl_ctx.ft_char_cache[i - start_char].uv.w = (f32)( height);
+
+		x += width + pixel_gap;
+		if((x + max_char_width) > atlas_width) {
+			y += max_char_height + pixel_gap;
+			x = 0;
+		}
+
+
+	}
+	
+	fflush(stdout);
+
+	glGenTextures(1, &gl_ctx.ft_atlas_texture);
+	glBindTexture(GL_TEXTURE_2D, gl_ctx.ft_atlas_texture);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	glTexImage2D(
+			GL_TEXTURE_2D, 0, GL_RED, atlas_width, atlas_height, 0,
+			GL_RED, GL_UNSIGNED_BYTE, gl_ctx.ft_atlas);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
+}
+
 int main(void) {
 
 	setup();
 
+	// glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+
 	setup_font_atlas();
+	setup_font_atlas_freetype();
 
 	while(!gl_ctx.should_close) {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+#ifdef USE_GLFW
+		int scancode = glfwGetKey(gl_ctx.window, GLFW_KEY_ESCAPE);
+		if(scancode == GLFW_PRESS) {
+			gl_ctx.should_close = 1;
+		}
+
+		glfwPollEvents();
+#else
+
 		handle_events();
+#endif
 
 		if(gl_ctx.input_size > 0) {
 
-			if(buf_len(text) > 0) {
-				buf__hdr(text)->size--;
+			if(buf_len(gl_ctx.text) > 0) {
+				buf__hdr(gl_ctx.text)->size--;
 			}
 
 			for(i32  i = 0; i < gl_ctx.input_size; i++) {
@@ -712,11 +1211,17 @@ int main(void) {
 				}
 			}
 
-			buf_push(text, '\0');
+			buf_push(gl_ctx.text, '\0');
 		}
 
 		render();
+
+#ifdef USE_GLFW
+		glfwSwapBuffers(gl_ctx.window);
+#else
 		SwapBuffers(gl_ctx.hdc);
+#endif
+
 		reset_global_context();
 	}
 

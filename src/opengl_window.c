@@ -96,7 +96,7 @@ void init_opengl() {
 
 	gl_ctx.screen_scale = ortho(0, 500, 0, 500, -1.0, 1.0);
 	glUniformMatrix4fv(3, 1, GL_FALSE, gl_ctx.screen_scale.m);
-	glViewport(0, 0, gl_ctx.width, gl_ctx.height);
+	glViewport(0, 0, 500, 500);
 
 	glGenBuffers(1, &gl_ctx.vbo);
 
@@ -106,7 +106,6 @@ void init_opengl() {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	glEnable(GL_MULTISAMPLE);
 	// glPointSize(1);
 
 	fflush(stdout);
@@ -163,11 +162,11 @@ LRESULT sh_window_proc(HWND h_wnd, UINT msg, WPARAM w_param, LPARAM l_param) {
 				gl_ctx.should_close = 1;
 			}
 
-			if(w_param == VK_UP) { gl_ctx.font_size++; }
-			if(w_param == VK_DOWN) { gl_ctx.font_size--; }
+			if(w_param == VK_UP) { gl_ctx.top_add++; }
+			if(w_param == VK_DOWN) { gl_ctx.top_add--; }
 
-			if(w_param == VK_LEFT) { gl_ctx.quad_height++; }
-			if(w_param == VK_RIGHT) { gl_ctx.quad_height--; }
+			if(w_param == VK_LEFT) { gl_ctx.left_add--; }
+			if(w_param == VK_RIGHT) { gl_ctx.left_add++; }
 
 
 		} break;
@@ -185,9 +184,66 @@ LRESULT sh_window_proc(HWND h_wnd, UINT msg, WPARAM w_param, LPARAM l_param) {
 	return result;
 }
 
+
+void handle_char(GLFWwindow *win, i32 key, i32 scancode, i32 action, i32 mod) {
+	if(action == GLFW_PRESS) {
+		char c = (char)key;
+		switch(key) {
+			case GLFW_KEY_ENTER: c = '\n'; break;
+			case GLFW_KEY_BACKSPACE: c = '\b'; break;
+			case GLFW_KEY_LEFT_SHIFT: return;
+			case GLFW_KEY_RIGHT_SHIFT: return;
+
+			case GLFW_KEY_UP: gl_ctx.top_add++; return; break;
+			case GLFW_KEY_DOWN: gl_ctx.top_add--; return; break;
+			case GLFW_KEY_LEFT: gl_ctx.left_add--; return; break;
+			case GLFW_KEY_RIGHT: gl_ctx.left_add++; return; break;
+
+			default: {
+				if(mod & GLFW_MOD_SHIFT) {
+					c = (char)key;
+				} else if(key >= 'A' && key <= 'Z') {
+					c = (char)(key + 32);
+				}
+			}
+		}
+
+
+		if(key == GLFW_KEY_ENTER) {
+			printf("it");
+			c = '\n';
+		}
+
+		printf("%d %c\n", key, (char)key);
+		gl_ctx.input[gl_ctx.input_size] = (char)c;
+		gl_ctx.input_size++;
+	}
+
+	fflush(stdout);
+}
+
 HWND sh_window_setup(void) {
+
+#ifdef USE_GLFW
+	GLFWwindow *window;
+	glfwInit();
+
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+
+
+	window = glfwCreateWindow(500, 500, "Hello World", NULL, NULL);
+	glfwMakeContextCurrent(window);
+
+	gl_ctx.window = window;
+	load_ext();
+	init_opengl();
+	glfwSetKeyCallback(window, handle_char);
+
+	return NULL;
+#else
 	WNDCLASS wndclass = {0};
-	wndclass.style = CS_OWNDC;
+	wndclass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 	wndclass.lpfnWndProc = (WNDPROC)sh_window_proc;
 	wndclass.hInstance = NULL;
 	wndclass.hbrBackground = (HBRUSH) (COLOR_BACKGROUND);
@@ -195,14 +251,19 @@ HWND sh_window_setup(void) {
 	wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	RegisterClass(&wndclass);
 
-	RECT win_size = { .left = gl_ctx.x, .right = gl_ctx.width, .top = gl_ctx.y, .bottom = gl_ctx.height };
+	i32 style = WS_OVERLAPPEDWINDOW;
+	RECT win_size = {
+		.left = 0,
+		.right = gl_ctx.width,
+		.top = 0,
+		.bottom = gl_ctx.height };
 
-	AdjustWindowRect(&win_size, WS_OVERLAPPEDWINDOW, FALSE);
+	AdjustWindowRect(&win_size, style, FALSE);
 
 	HWND wn = CreateWindow(
 			"sh_gui",
 			gl_ctx.window_name,
-			WS_VISIBLE | WS_OVERLAPPEDWINDOW,
+			WS_VISIBLE | style,
 			0,
 			0,
 			win_size.right - win_size.left,
@@ -219,6 +280,8 @@ HWND sh_window_setup(void) {
 	// init_time();
 	// init_raw_input();
 	return wn;
+#endif
+
 }
 
 void handle_events() {

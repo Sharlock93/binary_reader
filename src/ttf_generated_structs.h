@@ -62,7 +62,7 @@ typedef struct sh_hhea {
 typedef struct sh_maxp {
 	i32  version ; // version  
  	u16  numGlyphs ; // numGlyphs  
- 	u16  maxPois ; // maxPois  
+ 	u16  maxPoints ; // maxPois  
  	u16  maxContours ; // maxContours  
  	u16  maxComponentPois ; // maxComponentPois  
  	u16  maxComponentContours ; // maxComponentContours  
@@ -193,7 +193,7 @@ sh_maxp sh_read_maxp(const u8 *mem) {
 	sh_maxp new_struct = {0};
 	READ_BE(mem,GET_MEM_ADR(new_struct.version ), sizeof(i32 ));
 	READ_BE(mem,GET_MEM_ADR(new_struct.numGlyphs ), sizeof(u16 ));
-	READ_BE(mem,GET_MEM_ADR(new_struct.maxPois ), sizeof(u16 ));
+	READ_BE(mem,GET_MEM_ADR(new_struct.maxPoints ), sizeof(u16 ));
 	READ_BE(mem,GET_MEM_ADR(new_struct.maxContours ), sizeof(u16 ));
 	READ_BE(mem,GET_MEM_ADR(new_struct.maxComponentPois ), sizeof(u16 ));
 	READ_BE(mem,GET_MEM_ADR(new_struct.maxComponentContours ), sizeof(u16 ));
