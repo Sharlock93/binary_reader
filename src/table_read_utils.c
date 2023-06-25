@@ -309,85 +309,92 @@ sh_glyph_outline get_glyph_outline(font_directory *font, u16 char_code) {
 	glyph_outline.glyph_index = index;
 	sh_glyph_offset char_offset = get_glyph_offset(&font->loca, index, font->head.indexToLocFormat);
 	u8 *glyph_data_start = font->glyph_table+char_offset.offset;
-	i16 contour_count = BE_READ16(glyph_data_start);
-	
-	// mark 1
-	glyph_outline.p1.x = BE_READ16(glyph_data_start+2);
-	glyph_outline.p1.y = BE_READ16(glyph_data_start+4);
-	glyph_outline.p2.x = BE_READ16(glyph_data_start+6);
-	glyph_outline.p2.y = BE_READ16(glyph_data_start+8);
 
-	glyph_outline.contour_count = contour_count;
 
-	if(contour_count > 0) {
-		glyph_outline.instruction_length = BE_READ16(glyph_data_start+10+contour_count*2);
-		glyph_outline.instructions = (u8 *)malloc(glyph_outline.instruction_length);
-		glyph_outline.contour_last_index = (u16 *)malloc(2*contour_count);
+	if(char_offset.length != 0) {
 
-		for(int i = 0; i < contour_count; ++i) {
-			glyph_outline.contour_last_index[i] = BE_READ16(glyph_data_start+10+i*2);
-		}
+		i16 contour_count = BE_READ16(glyph_data_start);
 
-		memcpy(glyph_outline.instructions, glyph_data_start+10+contour_count*2+2, glyph_outline.instruction_length);
-		
-		i32 last_point_index = BE_READ16(glyph_data_start+10+(contour_count-1)*2);
-		i32 size_of_arrays = last_point_index+1; //last_point_index is 0 based
-		glyph_outline.points = (sh_font_point*) malloc(sizeof(sh_font_point)*(size_of_arrays));
-		
-		// flags
-		u8 *flag_start = glyph_data_start+10+contour_count*2+2+glyph_outline.instruction_length;
-		for(int i = 0; i < size_of_arrays; ++i) {
-			glyph_outline.points[i].flag = *(sh_glyph_flag*)flag_start;
-			if(glyph_outline.points[i].flag.repeat) {
-				++flag_start;
-				u8 repeat_count = *flag_start;
-				sh_glyph_flag repeated_item = glyph_outline.points[i].flag;
-				while(repeat_count-- > 0) {
-					glyph_outline.points[++i].flag = repeated_item;
-				}
-			} 
-			flag_start++;
-		}
+		// mark 1
+		glyph_outline.p1.x = BE_READ16(glyph_data_start+2);
+		glyph_outline.p1.y = BE_READ16(glyph_data_start+4);
+		glyph_outline.p2.x = BE_READ16(glyph_data_start+6);
+		glyph_outline.p2.y = BE_READ16(glyph_data_start+8);
 
-		u8 *cords_start = flag_start;
+		glyph_outline.contour_count = contour_count;
 
-		i16 init_point = 0;
+		if(contour_count > 0) {
+			glyph_outline.instruction_length = BE_READ16(glyph_data_start+10+contour_count*2);
+			glyph_outline.instructions = (u8 *)malloc(glyph_outline.instruction_length);
+			glyph_outline.contour_last_index = (u16 *)malloc(2*contour_count);
 
-		for(int i = 0; i < size_of_arrays; ++i) {
-			sh_glyph_flag flag = glyph_outline.points[i].flag;
-			u8 combined_info = (flag.x_short_vector_pos << 1) | (flag.x_short_vector);
-			switch(combined_info) {
-				case 0: {
-					init_point = BE_READ16(cords_start) + init_point;
-					cords_start += 2; break;
-				}
-				case 1: case 3: {
-					i16 current_point = (*cords_start);
-					init_point = (flag.x_short_vector_pos ? current_point : -current_point) + init_point;
-					cords_start += 1;
-				} break;
+			for(int i = 0; i < contour_count; ++i) {
+				glyph_outline.contour_last_index[i] = BE_READ16(glyph_data_start+10+i*2);
 			}
-			glyph_outline.points[i].x = init_point;
+
+			memcpy(glyph_outline.instructions, glyph_data_start+10+contour_count*2+2, glyph_outline.instruction_length);
+
+			i32 last_point_index = BE_READ16(glyph_data_start+10+(contour_count-1)*2);
+			i32 size_of_arrays = last_point_index+1; //last_point_index is 0 based
+			glyph_outline.points = (sh_font_point*) malloc(sizeof(sh_font_point)*(size_of_arrays));
+
+			// flags
+			u8 *flag_start = glyph_data_start+10+contour_count*2+2+glyph_outline.instruction_length;
+			for(int i = 0; i < size_of_arrays; ++i) {
+				glyph_outline.points[i].flag = *(sh_glyph_flag*)flag_start;
+				if(glyph_outline.points[i].flag.repeat) {
+					++flag_start;
+					u8 repeat_count = *flag_start;
+					sh_glyph_flag repeated_item = glyph_outline.points[i].flag;
+					while(repeat_count-- > 0) {
+						glyph_outline.points[++i].flag = repeated_item;
+					}
+				} 
+				flag_start++;
+			}
+
+			u8 *cords_start = flag_start;
+
+			i16 init_point = 0;
+
+			for(int i = 0; i < size_of_arrays; ++i) {
+				sh_glyph_flag flag = glyph_outline.points[i].flag;
+				u8 combined_info = (flag.x_short_vector_pos << 1) | (flag.x_short_vector);
+				switch(combined_info) {
+					case 0: {
+						init_point = BE_READ16(cords_start) + init_point;
+						cords_start += 2; break;
+					}
+					case 1: case 3: {
+						i16 current_point = (*cords_start);
+						init_point = (flag.x_short_vector_pos ? current_point : -current_point) + init_point;
+						cords_start += 1;
+					} break;
+				}
+				glyph_outline.points[i].x = init_point;
+			}
+
+			init_point = 0;
+			for(int i = 0; i < size_of_arrays; ++i) {
+				sh_glyph_flag info = glyph_outline.points[i].flag;
+				u8 combined_info = (info.y_short_vector_pos << 1) | (info.y_short_vector);
+				switch(combined_info) {
+					// case 2: glyph_outline.points[i].y = i > 0 ? glyph_outline.points[ i-1].y : 0 ; break; //special case
+					case 0: init_point = BE_READ16(cords_start) + init_point ; cords_start += 2; break;
+					case 1:case 3: {
+						i16 current_point = (*cords_start);
+						cords_start += 1;
+						init_point = (info.y_short_vector_pos ? current_point : -current_point) + init_point;
+					} break;
+				}
+				glyph_outline.points[i].y = init_point;
+			}
+			glyph_outline.points_count = size_of_arrays;
+		} else {
+			puts("comp");
 		}
 
-		init_point = 0;
-		for(int i = 0; i < size_of_arrays; ++i) {
-			sh_glyph_flag info = glyph_outline.points[i].flag;
-			u8 combined_info = (info.y_short_vector_pos << 1) | (info.y_short_vector);
-			switch(combined_info) {
-				// case 2: glyph_outline.points[i].y = i > 0 ? glyph_outline.points[ i-1].y : 0 ; break; //special case
-				case 0: init_point = BE_READ16(cords_start) + init_point ; cords_start += 2; break;
-				case 1:case 3: {
-					i16 current_point = (*cords_start);
-					cords_start += 1;
-					init_point = (info.y_short_vector_pos ? current_point : -current_point) + init_point;
-				} break;
-			}
-			glyph_outline.points[i].y = init_point;
-		}
-		glyph_outline.points_count = size_of_arrays;
 	}
-
 	// end_time_block(COUNTER, __func__);
 	return glyph_outline;
 }

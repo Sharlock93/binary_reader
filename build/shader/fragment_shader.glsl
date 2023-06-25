@@ -8,7 +8,7 @@ uniform sampler2D tex;
 out vec4 frag_color;
 
 void main() {
-	frag_color = color;
+	frag_color = vec4(1, 1, 1, 1);
 
 	if(has_texture) {
 		frag_color.w = texture(tex, frag_uv).r;

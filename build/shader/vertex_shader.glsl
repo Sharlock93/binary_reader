@@ -12,6 +12,7 @@ out vec2 frag_uv;
 void main() {
 
    gl_Position = vec4(vp.x, vp.y, 0, 1)*view;
+
    if(invert_y_uv) {
 	   frag_uv = vec2(uv.x, uv.y);
    } else {

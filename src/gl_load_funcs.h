@@ -13,6 +13,7 @@ PFNGLGETSHADERINFOLOGPROC glGetShaderInfoLog;
 PFNGLGETSHADERIVPROC glGetShaderiv;
 PFNGLVERTEXATTRIBPOINTERPROC glVertexAttribPointer;
 PFNGLENABLEVERTEXATTRIBARRAYPROC glEnableVertexAttribArray;
+PFNGLDISABLEVERTEXATTRIBARRAYPROC glDisableVertexAttribArray;
 PFNGLBUFFERDATAPROC glBufferData;
 PFNGLBINDBUFFERPROC glBindBuffer;
 PFNGLISBUFFERPROC glIsBuffer;
@@ -42,6 +43,7 @@ void load_ext() {
 	glGetShaderiv = (PFNGLGETSHADERIVPROC) wglGetProcAddress("glGetShaderiv");
 	glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC) wglGetProcAddress("glVertexAttribPointer");
 	glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC) wglGetProcAddress("glEnableVertexAttribArray");
+	glDisableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC) wglGetProcAddress("glDisableVertexAttribArray");
 	glBufferData = (PFNGLBUFFERDATAPROC) wglGetProcAddress("glBufferData");
 	glBindBuffer = (PFNGLBINDBUFFERPROC) wglGetProcAddress("glBindBuffer");
 	glIsBuffer = (PFNGLISBUFFERPROC) wglGetProcAddress("glIsBuffer");
