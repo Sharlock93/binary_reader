@@ -1,0 +1,28 @@
+struct rect {
+    tib[5] needed_bits;
+    tib[.needed_bits] xmin;
+    tib[.needed_bits] xmax;
+    tib[.needed_bits] ymin;
+    tib[.needed_bits] ymax;
+}
+
+struct swf_header {
+    char[3] swf;
+    u8 version;
+    u32 len;
+    rect r;
+    bit[3] pad;
+    u16be frame_rate;
+    u16 frames;
+}
+
+
+struct record_header {
+    u16 length ;
+    u16 tag_length;
+}
+
+swf_header p;
+record_header m;
+
+

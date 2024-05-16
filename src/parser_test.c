@@ -1253,6 +1253,14 @@ sh_decl* sh_parse_struct_field_decl() {
 
 	sh_next_token();
 
+    if(expect_token(SH_COLON)) {
+        i32 bit_field_size = parse_int_token(current_token);
+        sh_typespec *bit_field = sh_new_typespec(SH_TYPE_BIT_FIELD, new_decl->struct_field.type);
+        bit_field->size_bit = bit_field_size;
+        new_decl->struct_field.type = bit_field;
+        sh_next_token();
+    }
+
 	while(expect_token('@')) {
 		sh_decl_tag *tag = sh_parse_decl_tag();
 		buf_push(new_decl->tags, tag);

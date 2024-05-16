@@ -29,7 +29,6 @@ sh_expression* sh_parse_assert_struct_literal(void) {
 			if(is_token(SH_ASSIGNMENT)) {
 				assert_exit(false, "Cannot use expression as field name %s\n", sh_print_expr(blen));
 			}
-
 		}
 
 	} while(expect_token(SH_COMMA));

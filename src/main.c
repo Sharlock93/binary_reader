@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include "sh_tools.c"
 
+#define INCLUDE_LANGUAGE 1
 #include "language.c"
 #include "editor.c"
 
@@ -424,6 +425,7 @@ void render_letter(unsigned char *mem, int m_size, int m_w, int m_h, font_direct
 
 }
 
+/*
 void setup(void) {
 
 	// abcdefg
@@ -444,7 +446,7 @@ void setup(void) {
 
 
 }
-
+*/
 
 typedef struct split_lines {
 	char **lines;
@@ -1124,8 +1126,14 @@ void setup_font_atlas_freetype(void) {
 
 }
 
+
 int main(void) {
 
+    language_main();
+    test_binary_file("build\\tests\\bit_fields.sh_it", "build\\tests\\bit_fields");
+
+
+    return 0;
 	setup();
 
 	// glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );

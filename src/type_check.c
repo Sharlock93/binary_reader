@@ -54,6 +54,7 @@ i8 is_float(sh_type *t)                        { return t != NULL && (t == &sh_t
 i8 is_str(sh_type *t)                          { return t != NULL && t == &sh_type_string; }
 i8 is_ptr(sh_semantic_type *t)                 { return t != NULL && t->is_ptr; }
 i8 is_defined_type(sh_semantic_type *t)        { return t != NULL && t->base_type->type == SH_TYPE_DEFINED_TYPE; }
+i8 is_bit_field(sh_semantic_type *t)           { return t != NULL && t->base_type->type == SH_TYPE_DEFINED_TYPE; }
 i8 is_int_type(sh_semantic_type *t)            { return t != NULL && is_defined_type(t) && is_int(t->base_type->base_type); }
 i8 is_float_type(sh_semantic_type *t)          { return t != NULL && is_defined_type(t) && is_float(t->base_type->base_type); }
 i8 is_numeric_type(sh_semantic_type *t)        { return t != NULL && (is_int_type(t) || is_float_type(t)); }
@@ -64,6 +65,7 @@ i8 is_typespec_int_type(sh_typespec *t)        { return t != NULL && is_typespec
 i8 is_typespec_float_type(sh_typespec *t)      { return t != NULL && is_typespec_defined_type(t) && is_float(t->base_type); }
 i8 is_typespec_str(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && is_str(t->base_type); }
 i8 is_typespec_bit(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && t->base_type == &sh_type_bit; }
+i8 is_typespec_bit_field(sh_typespec *t)       { return t != NULL && t->type == SH_TYPE_BIT_FIELD && is_int(t->base->base_type); }
 i8 is_typespec_tib(sh_typespec *t)             { return t != NULL && is_typespec_defined_type(t) && t->base_type == &sh_type_tib; }
 i8 is_typespec_bit_or_tib(sh_typespec *t)      { return t != NULL && (is_typespec_bit(t) || is_typespec_tib(t)); }
 i8 is_typespec_struct(sh_typespec *t)          { return t != NULL && t->type == SH_TYPE_DEFINED_TYPE && t->base_type->is_struct == 1; }

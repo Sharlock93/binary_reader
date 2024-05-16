@@ -11,6 +11,7 @@ typedef enum sh_type_kind {
 	SH_TYPE_STRUCT,
 	SH_TYPE_ENUM,
 	SH_TYPE_WHEN,
+    SH_TYPE_BIT_FIELD
 } sh_type_kind;
 
 typedef struct sh_struct_type {

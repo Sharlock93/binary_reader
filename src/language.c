@@ -25,8 +25,6 @@ void compile(char *filepath);
 #include "breader.c"
 
 
-
-
 void setup() {
 	setup_internal_types();
 	setup_keywords();
@@ -86,7 +84,7 @@ void test_ttf() {
 }
 
 void language_main(void) {
-	// setup();
+	setup();
 	// test();
 	// test_bmp();
 	// test_png();

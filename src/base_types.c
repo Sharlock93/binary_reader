@@ -22,6 +22,8 @@ typedef enum sh_token_base_type {
 	SH_CLOSE_BRACKET = ']',
 	SH_SEMI_COLON = ';',
 
+	SH_COLON = ':',
+
 	SH_QUESTION_OPERATOR = '?', //wut? 
 	SH_COMMA = ',',
 	SH_DOT_OPERATOR = '.',
@@ -73,6 +75,7 @@ char *base_type_names[] = {
 	[SH_CLOSE_BRACKET] = "]",
 
 	[SH_SEMI_COLON] = ";",
+	[SH_COLON] = ":",
 
 	[SH_ASTERISK] = "*",
 	[SH_PLUS] = "+",

@@ -237,6 +237,7 @@ void sh_tokenize() {
 		case '}':
 		case '[':
 		case ';':
+        case ':':
 		case '.':
 		case ']': {
 			main_token.type.base = main_source[0];
