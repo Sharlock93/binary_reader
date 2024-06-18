@@ -1287,6 +1287,9 @@ sh_decl* sh_parse_struct_decl() {
 	i32 field_offset = 0;
 	while(!is_token('}')) {
 		sh_decl *field = sh_parse_struct_field_decl();
+
+        if(field->type.type)
+
 		field->struct_field.offset = field_offset;
 		field_offset += field->struct_field.type->size_byte; // offset and size are the same? 
 

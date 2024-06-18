@@ -1000,8 +1000,7 @@ void read_or_setup_data(sh_decl_val *v, i8 read_or_setup) {
         if(read_or_setup) {
             i64 val = read_int_val(v->type->base->base_type);
 
-            u64 mask = v->0;
-
+            // u64 mask = v->0;
             // v->ival = val;
             // v->read_size_byte += v->type->size_byte;
             // v->read_size_bit += v->type->size_bit;

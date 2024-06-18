@@ -1,5 +1,6 @@
 struct bit_fields {
     u8 n0 : 1;
+    u8 test;
 }
 
 bit_fields p;
