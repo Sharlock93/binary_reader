@@ -14,4 +14,10 @@ jobs:
     - name: run_said_build_bat
       run: |
         build/main.exe
-        shell: cmd
+      shell: cmd
+  
+    - uses: actions/upload-artifact@v4.6.0
+    - name: Upload a Build Artifact
+      with:
+        name: WhatIsHappening
+        path: build/main.exe
