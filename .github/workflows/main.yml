@@ -11,3 +11,7 @@ jobs:
       run: |
         build.bat
       shell: cmd
+    - name: run_said_build_bat
+      run: |
+        build/main.exe
+        shell: cmd
