@@ -9,5 +9,5 @@ jobs:
     - uses: ilammy/msvc-dev-cmd@v1.4.1
     - name: run
       run: |
-        binary_reader/build.bat
+        build.bat
       shell: cmd
