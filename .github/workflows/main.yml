@@ -30,5 +30,8 @@ jobs:
       with:
         files: |
           build/WhatIsHappening.zip
+          build/WhatIsHappening
+          WhatIsHappening
+          *.zip
           build/main.exe
           build/main.pdb
