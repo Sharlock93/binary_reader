@@ -22,7 +22,7 @@ jobs:
 
     - name: run_said_build_bat
       run: |
-        tree
+        tree /F /A
       shell: cmd
 
     - name: Release
