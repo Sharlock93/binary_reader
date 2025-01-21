@@ -22,8 +22,14 @@ jobs:
 
     - name: run_said_build_bat
       run: |
+        cd ..
         tree /F /A
       shell: cmd
+
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v4.1.8
+      with:
+        name: WhatIsHappening
 
     - name: Release
       uses: softprops/action-gh-release@v2
@@ -32,6 +38,7 @@ jobs:
         files: |
           build/WhatIsHappening.zip
           build/WhatIsHappening
+          WhatIsHappening
           WhatIsHappening
           *.zip
           build/main.exe
