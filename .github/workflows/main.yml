@@ -28,4 +28,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: WhatIsHappening
+        files: |
+          WhatIsHappening.zip
+          build/main.exe
+          build/main.pdb
