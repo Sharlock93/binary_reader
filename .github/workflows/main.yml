@@ -20,26 +20,25 @@ jobs:
           build/main.exe
           build/main.pdb
 
+
+    - name: Download a Build Artifact
+      uses: actions/download-artifact@v4.1.8
+      with:
+        name: WhatIsHappening
+        path: .
+
     - name: run_said_build_bat
       run: |
         cd ..
         tree /F /A
       shell: cmd
 
-    - name: Download a Build Artifact
-      uses: actions/download-artifact@v4.1.8
-      with:
-        name: WhatIsHappening
-
     - name: Release
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: |
-          build/WhatIsHappening.zip
-          build/WhatIsHappening
-          WhatIsHappening
-          WhatIsHappening
+          artifact/*.zip
           *.zip
           build/main.exe
           build/main.pdb
